@@ -1,0 +1,50 @@
+<%- include('../partials/header') %>
+<div class="page-head"><div><h1>Administração</h1><p class="lead">Dona do processo: cria o ciclo, mantém a matriz, os cadastros e a hierarquia, gera relatórios e libera resultados.</p></div></div>
+<div class="grid grid-cards">
+  <a class="card tile-link" href="/admin/teste">
+    <h2><%= testMode ? 'Modo de teste' : 'Sistema no ar' %></h2>
+    <p><%= testMode ? 'Entrar como outra pessoa, apagar avaliações de teste, recarregar exemplos e colocar no ar.' : 'O sistema está no ar e envia e-mails.' %></p>
+    <span class="tile-meta"><%= testMode ? counts.emailsRetidos + ' e-mail(s) retido(s)' : 'Desde ' + u.fmtDateTime(wentLiveAt) %></span>
+  </a>
+  <a class="card tile-link" href="/admin/ciclo">
+    <h2>Ciclo</h2>
+    <p>Datas de início e prazos de cada etapa, liberação de resultados, início e encerramento.</p>
+    <span class="tile-meta"><%= cycle ? cycle.name + ' · ' + u.CYCLE_STATUS[cycle.status] : 'Sem ciclo' %></span>
+  </a>
+  <a class="card tile-link" href="/admin/pessoas">
+    <h2>Pessoas e hierarquia</h2>
+    <p>Cadastros, e-mails (manual ou por planilha), perfis de acesso, cargos ocupados e gestor imediato.</p>
+    <span class="tile-meta"><%= counts.pessoas %> pessoas · <%= counts.vinculos %> verificações<%= counts.ficticios ? ' · ' + counts.ficticios + ' e-mail(s) fictício(s)' : '' %></span>
+  </a>
+  <a class="card tile-link" href="/admin/cargos">
+    <h2>Cargos</h2>
+    <p>Códigos, nomes, áreas e indicação de liderança.</p>
+    <span class="tile-meta">Usados na matriz e nos filtros</span>
+  </a>
+  <a class="card tile-link" href="/admin/matriz">
+    <h2>Matriz de competências</h2>
+    <p>Nível exigido por cargo e critérios, com controle de versão.</p>
+    <span class="tile-meta"><%= version ? 'Versão ' + version.number + ' de ' + u.fmtDate(version.version_date) : '—' %><%= locked ? ' · travada' : '' %><%= draft ? ' · rascunho em edição' : '' %></span>
+  </a>
+  <a class="card tile-link" href="/organograma">
+    <h2>Organograma</h2>
+    <p>Árvore da hierarquia: quem avalia quem.</p>
+    <span class="tile-meta">Visualização</span>
+  </a>
+  <a class="card tile-link" href="/admin/emails">
+    <h2>E-mails</h2>
+    <p>Caixa de saída: convites, avisos e lembretes (retidos no modo de teste).</p>
+    <span class="tile-meta"><%= counts.emailsErro ? counts.emailsErro + ' com erro' : 'Sem erros' %></span>
+  </a>
+  <a class="card tile-link" href="/admin/log">
+    <h2>Log de acesso (LGPD)</h2>
+    <p>Quem viu ou alterou o quê e quando.</p>
+    <span class="tile-meta">Filtros e exportação</span>
+  </a>
+  <a class="card tile-link" href="/admin/configuracoes">
+    <h2>Configurações</h2>
+    <p>Logo da empresa e situação do servidor de e-mail.</p>
+    <span class="tile-meta">Identidade visual</span>
+  </a>
+</div>
+<%- include('../partials/footer') %>

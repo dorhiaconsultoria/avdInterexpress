@@ -1,0 +1,42 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Minha equipe direta</h1>
+    <p class="lead"><%= cycle.name %> · você avalia <%= rows.length %> pessoa<%= rows.length === 1 ? '' : 's' %></p>
+  </div>
+</div>
+<div class="alert alert-info">
+  <strong>Orientação:</strong> avalie cada pessoa pelo que ela faz de fato, com uma evidência (fato observado) em cada competência.
+  A autoavaliação do colaborador só aparece depois que você enviar a sua avaliação. Por LGPD, você vê apenas a sua equipe direta.
+</div>
+<div class="table-wrap card flush">
+  <table class="table">
+    <thead>
+      <tr><th>Colaborador</th><th>Cargo</th><th>Autoavaliação</th><th>Minha avaliação</th><th>Resultado</th><th>Plano de ação</th><th>Assinaturas</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function (r) { %>
+        <tr>
+          <td><strong><%= r.cl.user_name %></strong></td>
+          <td><span class="code"><%= r.cl.cargo_code %></span> <%= r.cl.cargo_short %></td>
+          <td><%- u.evalBadge(r.auto) %></td>
+          <td><%- u.evalBadge(r.gestor) %><% if (r.gestor === 'rascunho') { %> <span class="muted"><%= r.progressGestor.done %>/<%= r.progressGestor.total %></span><% } %></td>
+          <td><%= r.released ? 'Liberado' : '—' %></td>
+          <td><% if (r.gestor === 'enviada') { %><%= r.plan.gapsDefined %>/<%= r.plan.gaps %> lacunas com ação<% } else { %>—<% } %></td>
+          <td>
+            <span class="sig <%= r.sigs.colaborador ? 'ok' : '' %>"><span aria-hidden="true"><%= r.sigs.colaborador ? '✓' : '○' %></span> Colaborador</span><br>
+            <span class="sig <%= r.sigs.gestor ? 'ok' : '' %>"><span aria-hidden="true"><%= r.sigs.gestor ? '✓' : '○' %></span> Gestor</span>
+          </td>
+          <td><%- u.statusBadge(r.cl.status) %></td>
+          <td class="right nowrap">
+            <% if (r.gestor !== 'enviada' && cycle.status === 'em_andamento') { %>
+              <a class="btn btn-sm btn-primary" href="/checklists/<%= r.cl.id %>/avaliar/gestor"><%= r.gestor === 'rascunho' ? 'Continuar' : 'Avaliar' %></a>
+            <% } %>
+            <a class="btn btn-sm" href="/checklists/<%= r.cl.id %>">Abrir</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,38 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › Matriz</p>
+<div class="page-head">
+  <div><h1>Matriz de competências</h1>
+  <p class="lead"><%= version ? 'Versão ' + version.number + ' de ' + u.fmtDate(version.version_date) + ' (vigente)' : 'Sem versão vigente' %></p></div>
+  <div class="actions">
+    <% if (draft) { %>
+      <a class="btn btn-primary" href="/admin/matriz/rascunho">Continuar editando o rascunho</a>
+    <% } else if (!locked) { %>
+      <form method="post" action="/admin/matriz/nova-versao"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-primary">Editar (criar nova versão)</button></form>
+    <% } %>
+  </div>
+</div>
+<% if (locked) { %>
+  <div class="alert alert-warn"><strong>Matriz travada:</strong> o ciclo está em andamento. <%= testMode ? 'No modo de teste, use "Apagar avaliações de teste" (Administração › Modo de teste) para voltar o ciclo ao planejamento e liberar a edição.' : 'Ela será destravada quando o ciclo for encerrado.' %></div>
+<% } else { %>
+  <div class="alert alert-info">Para alterar níveis ou critérios, crie uma nova versão: as mudanças ficam em rascunho até você publicar, com data e descrição do que mudou. A versão vigente é usada quando o ciclo for iniciado.</div>
+<% } %>
+<p class="muted">"—" significa que a competência não se aplica ao cargo e não aparece no checklist da pessoa. O avaliador não altera o nível exigido.</p>
+<section class="card flush"><%- include('../partials/matrix-table', { comps: comps, levels: levels, cargos: cargos }) %></section>
+<section class="card">
+  <h2>Definições e critérios</h2>
+  <%- include('../partials/criteria-list', { comps: comps }) %>
+</section>
+<section class="card">
+  <h2>Histórico de versões</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Versão</th><th>Data</th><th>Situação</th><th>O que mudou</th><th>Publicada por</th><th></th></tr></thead>
+      <tbody>
+        <% versions.forEach(function (v) { %>
+          <tr><td><strong><%= v.number %></strong></td><td><%= u.fmtDate(v.version_date) %></td><td><%= v.status === 'vigente' ? 'Vigente' : 'Substituída' %></td><td><%= v.notes %></td><td><%= v.created_by_name || '—' %></td><td class="right"><a class="btn btn-sm" href="/admin/matriz/versao/<%= v.id %>">Ver</a></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('../partials/footer') %>

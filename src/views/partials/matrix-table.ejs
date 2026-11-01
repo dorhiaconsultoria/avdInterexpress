@@ -1,0 +1,17 @@
+<% /* Tabela da matriz (somente leitura). Espera: comps, levels, cargos */ %>
+<div class="table-wrap">
+  <table class="table matrix">
+    <thead>
+      <tr><th>Cód.</th><th>Cargo</th><% comps.forEach(function (c) { %><th class="center" title="<%= c.name %>"><%= c.code %></th><% }) %></tr>
+    </thead>
+    <tbody>
+      <% cargos.forEach(function (cargo) { var lv = levels[cargo.id] || {}; %>
+        <tr>
+          <td class="code"><%= cargo.code %></td>
+          <td class="nowrap"><%= cargo.short_title %></td>
+          <% comps.forEach(function (c) { %><td class="center"><%- u.levelChip(lv[c.code]) %></td><% }) %>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

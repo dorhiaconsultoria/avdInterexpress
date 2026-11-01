@@ -1,0 +1,14 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › <a href="/admin/emails">E-mails</a> › Mensagem</p>
+<section class="card">
+  <h1 class="h2"><%= email.subject %></h1>
+  <dl class="kv kv-grid">
+    <div><dt>Para</dt><dd><%= email.to_email %></dd></div>
+    <div><dt>Criado em</dt><dd><%= u.fmtDateTime(email.created_at) %></dd></div>
+    <div><dt>Situação</dt><dd><%= EMAIL_STATUS[email.status] || email.status %><%= email.sent_at ? ' em ' + u.fmtDateTime(email.sent_at) : '' %></dd></div>
+  </dl>
+  <h2 class="mt">Prévia</h2>
+  <iframe class="email-preview" src="/admin/emails/<%= email.id %>/html" title="Prévia do e-mail" sandbox></iframe>
+  <details class="mt"><summary>Versão em texto (os links aparecem aqui)</summary><pre class="pre"><%= email.text %></pre></details>
+</section>
+<%- include('../partials/footer') %>

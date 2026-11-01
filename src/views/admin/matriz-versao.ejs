@@ -1,0 +1,13 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › <a href="/admin/matriz">Matriz</a> › Versão <%= version.number %></p>
+<div class="page-head"><div><h1>Matriz — Versão <%= version.number %></h1><p class="lead"><%= u.fmtDate(version.version_date) %> · <%= version.status === 'vigente' ? 'Vigente' : 'Substituída' %></p></div></div>
+<section class="card">
+  <h2>O que mudou</h2>
+  <p><%= version.notes %></p>
+  <% if (prev) { %>
+    <% if (changes.length) { %><ul class="plain list-lines"><% changes.forEach(function (c) { %><li><%= c %></li><% }) %></ul><% } else { %><p class="muted">Sem diferenças em relação à versão <%= prev.number %>.</p><% } %>
+  <% } else { %><p class="muted">Primeira versão.</p><% } %>
+</section>
+<section class="card flush"><%- include('../partials/matrix-table', { comps: comps, levels: levels, cargos: cargos }) %></section>
+<section class="card"><h2>Definições e critérios</h2><%- include('../partials/criteria-list', { comps: comps }) %></section>
+<%- include('../partials/footer') %>

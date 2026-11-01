@@ -1,0 +1,16 @@
+<%- include('../partials/header') %>
+<section class="auth">
+  <div class="card auth-card">
+    <h1><%= mode === 'convite' ? 'Bem-vindo(a), ' + person.name + '!' : 'Nova senha' %></h1>
+    <p class="muted"><%= mode === 'convite' ? 'Crie a sua senha para acessar a Verificação de Competências.' : 'Crie uma nova senha para ' + person.email + '.' %></p>
+    <% if (error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
+    <form method="post" class="form">
+      <input type="text" name="username" value="<%= person.email %>" autocomplete="username" hidden>
+      <label class="field"><span>Senha</span><input type="password" name="senha" autocomplete="new-password" required minlength="8"></label>
+      <label class="field"><span>Confirme a senha</span><input type="password" name="confirmacao" autocomplete="new-password" required minlength="8"></label>
+      <p class="hint">Mínimo de 8 caracteres, com letras e números.</p>
+      <button class="btn btn-primary btn-block"><%= mode === 'convite' ? 'Criar senha e entrar' : 'Salvar nova senha' %></button>
+    </form>
+  </div>
+</section>
+<%- include('../partials/footer') %>

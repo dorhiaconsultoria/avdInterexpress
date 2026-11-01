@@ -1,0 +1,165 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Olá, <%= user.name %></h1>
+    <% if (cycle) { %>
+      <p class="lead"><%= cycle.name %> · <%= u.CYCLE_STATUS[cycle.status] %></p>
+    <% } else { %>
+      <p class="lead">Nenhum ciclo cadastrado.</p>
+    <% } %>
+  </div>
+</div>
+
+<% alerts.forEach(function (a) { %>
+  <div class="alert alert-<%= a.type %> alert-row"><span><%= a.text %></span><% if (a.href) { %><a class="btn btn-sm" href="<%= a.href %>"><%= a.cta %></a><% } %></div>
+<% }) %>
+
+<div class="grid grid-2-1">
+  <section class="card" aria-labelledby="h-tarefas">
+    <h2 id="h-tarefas">O que eu preciso fazer</h2>
+    <% var allTasks = myTasks.concat(adminTasks); %>
+    <% if (!cycle || cycle.status !== 'em_andamento') { %>
+      <p class="empty">O ciclo ainda não começou. Quando começar, as suas tarefas aparecem aqui.</p>
+    <% } else if (!allTasks.length) { %>
+      <p class="empty"><span aria-hidden="true">✓</span> Nenhuma pendência no momento.</p>
+    <% } else { %>
+      <ul class="tasklist">
+        <% allTasks.forEach(function (t) { %>
+          <li class="task">
+            <div>
+              <div class="task-text"><%= t.text %></div>
+              <div class="task-meta"><%- u.deadline(t.deadline) %></div>
+            </div>
+            <a class="btn btn-sm btn-primary" href="<%= t.href %>">Abrir</a>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+    <% if (pendCount) { %>
+      <p class="mt"><a href="/acompanhamento">Ver todas as pendências do ciclo (<%= pendCount %>) e enviar lembretes →</a></p>
+    <% } %>
+  </section>
+
+  <% if (cycle) { %>
+  <section class="card" aria-labelledby="h-ciclo">
+    <h2 id="h-ciclo">Prazos do <%= cycle.name %></h2>
+    <%- include('partials/cycle-steps', { cycle: cycle }) %>
+  </section>
+  <% } %>
+</div>
+
+<% if (myCards.length) { %>
+<section aria-labelledby="h-meus">
+  <h2 id="h-meus" class="section-title">Meu checklist<%= myCards.length > 1 ? 's' : '' %></h2>
+  <% if (myCards.length > 1) { %><p class="muted">Você ocupa <%= myCards.length %> cargos e por isso tem um checklist para cada um.</p><% } %>
+  <div class="grid grid-cards">
+    <% myCards.forEach(function (c) { %>
+      <article class="card cl-card">
+        <div class="cl-card-head">
+          <div>
+            <div class="code"><%= c.cl.cargo_code %></div>
+            <h3><%= c.cl.cargo_title %></h3>
+          </div>
+          <%- u.statusBadge(c.cl.status) %>
+        </div>
+        <dl class="kv">
+          <dt>Avaliador</dt><dd><%= c.evaluatorLabel %></dd>
+          <% if (c.cl.self_verification) { %>
+            <dt>Autoverificação</dt><dd><%- u.evalBadge(c.gestor) %> <% if (c.gestor === 'rascunho') { %><span class="muted"><%= c.progressGestor.done %>/<%= c.progressGestor.total %></span><% } %></dd>
+            <dt>Validação</dt><dd><%= c.cl.validator_name || 'Validador a definir (ou ata da Diretoria)' %></dd>
+          <% } else { %>
+            <dt>Autoavaliação</dt><dd><%- u.evalBadge(c.auto) %> <% if (c.auto === 'rascunho') { %><span class="muted"><%= c.progressAuto.done %>/<%= c.progressAuto.total %></span><% } %></dd>
+            <dt>Avaliação do gestor</dt><dd><%= c.gestor === 'enviada' ? 'Concluída' : 'Aguardando o gestor' %></dd>
+            <dt>Resultado</dt><dd><%= c.released ? 'Liberado' : 'Ainda não liberado' %></dd>
+          <% } %>
+        </dl>
+        <p class="next"><strong>Próximo passo:</strong> <%= c.stage.text %></p>
+        <div class="actions">
+          <% if (c.cl.self_verification && c.gestor !== 'enviada' && cycle.status === 'em_andamento') { %>
+            <a class="btn btn-primary" href="/checklists/<%= c.cl.id %>/avaliar/gestor"><%= c.gestor === 'rascunho' ? 'Continuar autoverificação' : 'Fazer autoverificação' %></a>
+          <% } else if (!c.cl.self_verification && c.auto !== 'enviada' && cycle.status === 'em_andamento') { %>
+            <a class="btn btn-primary" href="/checklists/<%= c.cl.id %>/avaliar/auto"><%= c.auto === 'rascunho' ? 'Continuar autoavaliação' : 'Começar autoavaliação' %></a>
+          <% } %>
+          <a class="btn" href="/checklists/<%= c.cl.id %>">Abrir checklist</a>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
+<% if (isManager) { %>
+<section class="card" aria-labelledby="h-equipe">
+  <div class="card-head">
+    <h2 id="h-equipe">Minha equipe direta</h2>
+    <a href="/equipe">Ver detalhes →</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Colaborador</th><th>Cargo</th><th>Autoavaliação</th><th>Minha avaliação</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% team.forEach(function (r) { %>
+          <tr>
+            <td><%= r.cl.user_name %></td>
+            <td><span class="code"><%= r.cl.cargo_code %></span> <%= r.cl.cargo_short %></td>
+            <td><%- u.evalBadge(r.auto) %></td>
+            <td><%- u.evalBadge(r.gestor) %></td>
+            <td><%- u.statusBadge(r.cl.status) %></td>
+            <td class="right">
+              <% if (r.gestor !== 'enviada' && cycle.status === 'em_andamento') { %>
+                <a class="btn btn-sm btn-primary" href="/checklists/<%= r.cl.id %>/avaliar/gestor"><%= r.gestor === 'rascunho' ? 'Continuar' : 'Avaliar' %></a>
+              <% } else { %>
+                <a class="btn btn-sm" href="/checklists/<%= r.cl.id %>">Abrir</a>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>
+
+<% if (validations.length) { %>
+<section class="card" aria-labelledby="h-valid">
+  <h2 id="h-valid">Validações sob minha responsabilidade</h2>
+  <ul class="tasklist">
+    <% validations.forEach(function (cl) { %>
+      <li class="task">
+        <div><div class="task-text">Autoverificação de <%= cl.user_name %> — <%= cl.cargo_code %> <%= cl.cargo_short %></div>
+        <div class="task-meta"><%- u.statusBadge(cl.status) %></div></div>
+        <a class="btn btn-sm" href="/checklists/<%= cl.id %>">Abrir</a>
+      </li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+
+<% if (coverage) { %>
+<section class="card" aria-labelledby="h-cob">
+  <div class="card-head">
+    <h2 id="h-cob">Cobertura do <%= cycle.name %></h2>
+    <% if (user.is_admin || user.is_ceo) { %><a href="/relatorios">Relatórios →</a><% } else { %><a href="/sgi">Indicadores SGI →</a><% } %>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-value"><%= coverage.previstas %></div><div class="stat-label">verificações previstas</div></div>
+    <div class="stat"><div class="stat-value"><%= coverage.realizadas %></div><div class="stat-label">realizadas</div></div>
+    <div class="stat stat-accent"><div class="stat-value"><%= u.fmtPct(coverage.cobertura) %></div><div class="stat-label">cobertura (meta 100%)</div></div>
+    <div class="stat"><div class="stat-value"><%= coverage.assinados %></div><div class="stat-label">checklists assinados</div></div>
+  </div>
+  <div class="meter" role="img" aria-label="Cobertura <%= u.fmtPct(coverage.cobertura) %> de 100%"><span style="width: <%= Math.min(100, coverage.cobertura) %>%"></span></div>
+</section>
+<% } %>
+
+<section class="card guide" aria-labelledby="h-como">
+  <h2 id="h-como">Como funciona a verificação</h2>
+  <ol class="steps">
+    <li><strong>Autoavaliação.</strong> O colaborador vê os níveis exigidos para o seu cargo e dá a sua nota em cada competência, sempre com uma evidência.</li>
+    <li><strong>Avaliação do gestor.</strong> O gestor avalia a equipe direta com evidências. Ele só vê a autoavaliação depois de enviar a dele.</li>
+    <li><strong>Resultado.</strong> O RH libera o resultado. O sistema calcula as lacunas (nota do gestor menor que o nível exigido).</li>
+    <li><strong>Plano de ação.</strong> Cada lacuna ganha uma ação, um responsável e um prazo. Também é possível incluir ações livres de desenvolvimento.</li>
+    <li><strong>Assinaturas.</strong> Colaborador e gestor confirmam eletronicamente. O checklist fecha com as duas assinaturas.</li>
+  </ol>
+  <p class="muted">Escala: <strong>1</strong> Não atende · <strong>2</strong> Em desenvolvimento · <strong>3</strong> Atende ao padrão. A nota descreve o que a pessoa faz de fato, não uma impressão geral.</p>
+</section>
+<%- include('partials/footer') %>

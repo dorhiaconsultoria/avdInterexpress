@@ -1,0 +1,444 @@
+<%- include('../partials/header') %>
+<%
+  var isSelf = !!cl.self_verification;
+  var autoEv = evals.auto, gestorEv = evals.gestor;
+  var autoSt = autoEv ? autoEv.status : 'pendente';
+  var gestorSt = gestorEv ? gestorEv.status : 'pendente';
+  var cycleOpen = cycle.status === 'em_andamento';
+  var verLabel = isSelf ? 'Autoverificação' : 'Gestor';
+  var attFor = function (evId, code) { return attachments.filter(function (a) { return a.evaluation_id === evId && a.competency_code === code; }); };
+  var seePlanAll = access.seeGestor && gestorSt === 'enviada';
+%>
+<p class="crumbs"><a href="/">Início</a> › Checklist de <%= cl.user_name %> (<%= cl.cargo_code %>)</p>
+<%- include('../partials/cl-header', { compact: false }) %>
+
+<div class="toolbar">
+  <a class="btn" href="/checklists/<%= cl.id %>/pdf">Baixar PDF do checklist</a>
+  <% if (access.readOnlyRole) { %><span class="muted">Consulta somente leitura · acesso registrado no log (LGPD)</span><% } %>
+</div>
+
+<!-- Etapas -->
+<section class="card" aria-labelledby="h-etapas">
+  <h2 id="h-etapas">Etapas</h2>
+  <ol class="stepper">
+    <% if (!isSelf) { %>
+      <li class="<%= autoSt === 'enviada' ? 'done' : (autoSt === 'rascunho' ? 'current' : '') %>">
+        <span class="step-dot" aria-hidden="true"><%= autoSt === 'enviada' ? '✓' : '1' %></span>
+        <span class="step-title">Autoavaliação</span>
+        <span class="step-meta"><%= autoSt === 'enviada' ? 'Enviada em ' + u.fmtDateTime(autoEv.submitted_at) : u.EVAL_STATUS[autoSt] %></span>
+      </li>
+    <% } %>
+    <li class="<%= gestorSt === 'enviada' ? 'done' : (gestorSt === 'rascunho' ? 'current' : '') %>">
+      <span class="step-dot" aria-hidden="true"><%= gestorSt === 'enviada' ? '✓' : (isSelf ? '1' : '2') %></span>
+      <span class="step-title"><%= isSelf ? 'Autoverificação' : 'Avaliação do gestor' %></span>
+      <span class="step-meta"><%= gestorSt === 'enviada' ? 'Enviada em ' + u.fmtDateTime(gestorEv.submitted_at) : u.EVAL_STATUS[gestorSt] %></span>
+    </li>
+    <% if (!isSelf) { %>
+      <li class="<%= cl.results_released_at ? 'done' : '' %>">
+        <span class="step-dot" aria-hidden="true"><%= cl.results_released_at ? '✓' : '3' %></span>
+        <span class="step-title">Resultado liberado</span>
+        <span class="step-meta"><%= cl.results_released_at ? u.fmtDateTime(cl.results_released_at) : 'Pelo RH, após as duas avaliações' %></span>
+      </li>
+    <% } %>
+    <li class="<%= gestorSt === 'enviada' && plan.complete && !plan.freePending ? 'done' : '' %>">
+      <span class="step-dot" aria-hidden="true"><%= gestorSt === 'enviada' && plan.complete && !plan.freePending ? '✓' : (isSelf ? '2' : '4') %></span>
+      <span class="step-title">Plano de ação</span>
+      <span class="step-meta"><%= gestorSt === 'enviada' ? plan.gapsDefined + ' de ' + plan.gaps + ' lacunas com ação' : 'Após a avaliação' %></span>
+    </li>
+    <li class="<%= cl.status === 'assinada' ? 'done' : '' %>">
+      <span class="step-dot" aria-hidden="true"><%= cl.status === 'assinada' ? '✓' : (isSelf ? '3' : '5') %></span>
+      <span class="step-title"><%= isSelf ? 'Assinatura e validação' : 'Assinaturas' %></span>
+      <span class="step-meta"><%= cl.status === 'assinada' ? 'Fechado em ' + u.fmtDateTime(cl.closed_at) : stage.text %></span>
+    </li>
+  </ol>
+
+  <div class="next-box">
+    <div><strong>Próximo passo:</strong> <%= stage.text %></div>
+    <div class="actions">
+      <% if (access.canEditAuto) { %>
+        <a class="btn btn-primary" href="/checklists/<%= cl.id %>/avaliar/auto"><%= autoEv ? 'Continuar autoavaliação' : 'Começar autoavaliação' %></a>
+      <% } %>
+      <% if (access.canEditGestor) { %>
+        <a class="btn btn-primary" href="/checklists/<%= cl.id %>/avaliar/gestor"><%= gestorEv ? 'Continuar ' + (isSelf ? 'autoverificação' : 'avaliação') : (isSelf ? 'Fazer autoverificação' : 'Avaliar ' + cl.user_name) %></a>
+      <% } %>
+      <% if (access.canRelease) { %>
+        <form method="post" action="/checklists/<%= cl.id %>/liberar" class="inline-form" data-confirm="Liberar o resultado para <%= cl.user_name %>? Ele(a) passará a ver a avaliação do gestor e receberá um aviso.">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn btn-accent">Liberar resultado</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</section>
+
+<!-- Resultado -->
+<section class="card" aria-labelledby="h-resultado" id="resultado">
+  <h2 id="h-resultado">Níveis exigidos e verificados</h2>
+  <% if (access.blockedAsEvaluator) { %>
+    <div class="alert alert-info">A autoavaliação de <%= cl.user_name %> fica oculta até você enviar a sua avaliação, para não haver influência.</div>
+  <% } %>
+  <% if (access.isOwner && !isSelf && !access.released) { %>
+    <div class="alert alert-info">A avaliação do gestor aparece aqui depois que o RH liberar o resultado.</div>
+  <% } %>
+  <div class="table-wrap">
+    <table class="table result-table">
+      <thead>
+        <tr>
+          <th>Competência</th>
+          <th class="center">Exigido</th>
+          <% if (!isSelf) { %><th class="center">Autoavaliação</th><% } %>
+          <th class="center"><%= isSelf ? 'Autoverificação' : 'Gestor' %></th>
+          <% if (!isSelf) { %><th class="center" title="Nota do gestor menos a autoavaliação">Diferença</th><% } %>
+          <th>Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% comps.applicable.forEach(function (c) {
+             var a = access.seeAuto && autoEv && autoEv.status === 'enviada' ? autoEv.items[c.code] : null;
+             var g = access.seeGestor && gestorEv && gestorEv.status === 'enviada' ? gestorEv.items[c.code] : null;
+             var aR = a ? a.rating : null, gR = g ? g.rating : null; %>
+          <tr>
+            <td>
+              <span class="code"><%= c.code %></span> <strong><%= c.name %></strong>
+              <% if (a || g) { %>
+                <details class="evid">
+                  <summary>Evidências</summary>
+                  <% if (a) { %>
+                    <div class="evid-block"><span class="evid-who">Autoavaliação:</span> <%= a.evidence %>
+                      <% attFor(autoEv.id, c.code).forEach(function (f) { %><div class="small"><a href="/anexos/<%= f.id %>">📎 <%= f.original_name %></a></div><% }) %>
+                    </div>
+                  <% } %>
+                  <% if (g) { %>
+                    <div class="evid-block"><span class="evid-who"><%= verLabel %>:</span> <%= g.evidence %>
+                      <% attFor(gestorEv.id, c.code).forEach(function (f) { %><div class="small"><a href="/anexos/<%= f.id %>">📎 <%= f.original_name %></a></div><% }) %>
+                    </div>
+                  <% } %>
+                </details>
+              <% } %>
+            </td>
+            <td class="center"><%- u.levelChip(c.required) %></td>
+            <% if (!isSelf) { %>
+              <td class="center"><%- aR != null ? u.levelChip(aR) : (access.blockedAsEvaluator && autoSt === 'enviada' ? '<span class="muted small">oculta</span>' : '<span class="muted">—</span>') %></td>
+            <% } %>
+            <td class="center"><%- gR != null ? u.levelChip(gR) : '<span class="muted">—</span>' %></td>
+            <% if (!isSelf) { %><td class="center"><%= aR != null && gR != null ? u.diffText(gR - aR) : '—' %></td><% } %>
+            <td><%- u.gapBadge(c.required, gR) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% if (comps.notApplicable.length) { %>
+    <p class="muted small mt">Não se aplicam ao cargo: <%= comps.notApplicable.map(function (c) { return c.code + ' ' + c.name; }).join(' · ') %>.</p>
+  <% } %>
+  <% if (access.seeGestor && gestorSt === 'enviada') { %>
+    <p class="mt"><strong><%= gaps.length %></strong> lacuna<%= gaps.length === 1 ? '' : 's' %> em <%= comps.applicable.length %> competências avaliadas.</p>
+  <% } %>
+</section>
+
+<!-- Plano de ação / PDI -->
+<section class="card" aria-labelledby="h-plano" id="plano">
+  <div class="card-head">
+    <h2 id="h-plano">Plano de ação / PDI</h2>
+    <% if (seePlanAll) { %>
+      <div class="chips-inline">
+        <span class="chip">Lacunas: <strong><%= plan.gaps %></strong></span>
+        <span class="chip">Com ação definida: <strong><%= plan.gapsDefined %>/<%= plan.gaps %></strong></span>
+        <span class="chip">Ações concluídas: <strong><%= plan.done %>/<%= plan.total %></strong></span>
+      </div>
+    <% } %>
+  </div>
+  <p class="muted">Para toda lacuna o sistema abre uma linha de ação. O fechamento exige 100% das lacunas com ação, responsável e prazo. Também é possível incluir ações livres de desenvolvimento: o colaborador sugere e o gestor complementa e valida.</p>
+  <% if (Object.keys(sigs).length && cl.status !== 'assinada') { %>
+    <div class="alert alert-warn">Já existe assinatura neste checklist, então o plano está travado. Para alterar, quem assinou precisa retirar a assinatura.</div>
+  <% } %>
+
+  <%
+    var visibleActions = seePlanAll ? actions : actions.filter(function (a) { return a.origin === 'livre' && a.proposed_by === user.id; });
+  %>
+  <% if (!visibleActions.length) { %>
+    <p class="empty"><%= gestorSt === 'enviada' ? (seePlanAll ? 'Nenhuma lacuna nem ação registrada. Você pode incluir ações livres de desenvolvimento.' : 'O plano aparece depois da liberação do resultado.') : 'As linhas de lacuna aparecem automaticamente quando a avaliação do gestor for enviada.' %></p>
+  <% } %>
+
+  <div class="actions-list">
+  <% visibleActions.forEach(function (a) {
+       var isGap = a.origin === 'lacuna';
+       var comp = isGap ? comps.applicable.find(function (c) { return c.code === a.competency_code; }) : null;
+       var canEdit = isGap ? access.canEditGapActions : (access.canValidateFree || (access.canProposeFree && a.proposed_by === user.id));
+       var defined = !!(a.action && a.responsible && a.due_date); %>
+    <article class="action-card <%= isGap ? 'gap' : 'free' %> <%= isGap && !defined ? 'incomplete' : '' %>">
+      <header class="action-head">
+        <div>
+          <% if (isGap) { %>
+            <span class="tag tag-gap">Lacuna</span>
+            <strong><%= a.competency_code %> <%= comp ? comp.name : '' %></strong>
+            <span class="muted">· exigido <%= a.required_level %>, verificado <%= a.verified_level %> (<%= a.verified_level - a.required_level %>)</span>
+          <% } else { %>
+            <span class="tag tag-free"><%= categories[a.category] || 'Desenvolvimento' %></span>
+            <span class="muted">sugerida por <%= a.proposed_by_name || '—' %></span>
+            <% if (a.validated_by) { %><span class="badge badge-success"><span aria-hidden="true">✓</span> Validada por <%= a.validated_by_name %></span><% } else { %><span class="badge badge-warn"><span aria-hidden="true">!</span> Aguardando validação do gestor</span><% } %>
+          <% } %>
+        </div>
+        <%- u.actionBadge(a.status) %>
+      </header>
+      <% if (canEdit) { %>
+        <form method="post" action="/checklists/<%= cl.id %>/plano/<%= a.id %>" class="action-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="field span-full"><span>Ação acordada</span><textarea name="action" rows="2" maxlength="2000" placeholder="O que será feito para desenvolver a competência"><%= a.action || '' %></textarea></label>
+          <% if (!isGap) { %>
+            <label class="field"><span>Tipo</span>
+              <select name="category"><% Object.keys(categories).forEach(function (k) { %><option value="<%= k %>" <%= a.category === k ? 'selected' : '' %>><%= categories[k] %></option><% }) %></select>
+            </label>
+          <% } %>
+          <label class="field"><span>Responsável</span><input name="responsible" value="<%= a.responsible || '' %>" maxlength="200" list="resp-list-<%= cl.id %>"></label>
+          <label class="field"><span>Prazo</span><input type="date" name="due_date" value="<%= a.due_date || '' %>"></label>
+          <label class="field"><span>Status</span>
+            <select name="status"><% Object.keys(actionStatus).forEach(function (k) { %><option value="<%= k %>" <%= a.status === k ? 'selected' : '' %>><%= actionStatus[k] %></option><% }) %></select>
+          </label>
+          <div class="action-buttons span-full">
+            <button class="btn btn-sm btn-primary">Salvar</button>
+          </div>
+        </form>
+        <div class="action-buttons">
+          <% if (!isGap && !a.validated_by && access.canValidateFree) { %>
+            <form method="post" action="/checklists/<%= cl.id %>/plano/<%= a.id %>/validar" class="inline-form">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm btn-accent">Validar ação</button>
+            </form>
+          <% } %>
+          <% if (!isGap) { %>
+            <form method="post" action="/checklists/<%= cl.id %>/plano/<%= a.id %>/excluir" class="inline-form" data-confirm="Excluir esta ação?">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm btn-ghost danger">Excluir</button>
+            </form>
+          <% } %>
+        </div>
+      <% } else { %>
+        <dl class="kv kv-grid kv-tight">
+          <div class="span-full"><dt>Ação acordada</dt><dd><%= a.action || 'Ainda não definida' %></dd></div>
+          <div><dt>Responsável</dt><dd><%= a.responsible || '—' %></dd></div>
+          <div><dt>Prazo</dt><dd><%= u.fmtDate(a.due_date) %></dd></div>
+          <% if (a.completed_at) { %><div><dt>Concluída em</dt><dd><%= u.fmtDateTime(a.completed_at) %></dd></div><% } %>
+        </dl>
+        <% if (access.canUpdateActionStatus && defined) { %>
+          <form method="post" action="/checklists/<%= cl.id %>/plano/<%= a.id %>/status" class="inline-form status-form">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <label class="sr-only" for="st-<%= a.id %>">Andamento</label>
+            <select id="st-<%= a.id %>" name="status"><% Object.keys(actionStatus).forEach(function (k) { %><option value="<%= k %>" <%= a.status === k ? 'selected' : '' %>><%= actionStatus[k] %></option><% }) %></select>
+            <button class="btn btn-sm">Atualizar andamento</button>
+          </form>
+        <% } %>
+      <% } %>
+    </article>
+  <% }) %>
+  </div>
+  <datalist id="resp-list-<%= cl.id %>">
+    <option value="<%= cl.user_name %>"><% if (!isSelf) { %><option value="<%= cl.evaluator_name %>"><% } %><option value="RH">
+  </datalist>
+
+  <% if (access.canProposeFree) { %>
+    <details class="add-action" <%= visibleActions.length ? '' : 'open' %>>
+      <summary class="btn btn-sm">+ Incluir ação livre de desenvolvimento</summary>
+      <form method="post" action="/checklists/<%= cl.id %>/plano/nova" class="action-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="field"><span>Tipo</span>
+          <select name="category"><% Object.keys(categories).forEach(function (k) { %><option value="<%= k %>"><%= categories[k] %></option><% }) %></select>
+        </label>
+        <label class="field span-2"><span>Ação</span><input name="action" required maxlength="2000" placeholder="Ex.: curso de legislação aduaneira, mentoria, projeto, leitura"></label>
+        <label class="field"><span>Responsável</span><input name="responsible" maxlength="200" value="<%= access.isOwner ? cl.user_name : '' %>" list="resp-list-<%= cl.id %>"></label>
+        <label class="field"><span>Prazo</span><input type="date" name="due_date"></label>
+        <div class="action-buttons span-full"><button class="btn btn-sm btn-primary"><%= access.isEvaluator || isSelf ? 'Incluir ação' : 'Sugerir ação' %></button></div>
+      </form>
+    </details>
+  <% } %>
+
+  <div class="notes" id="observacoes">
+    <h3>Observações do <%= isSelf ? 'titular' : 'gestor' %></h3>
+    <% if (access.canEditNotes) { %>
+      <form method="post" action="/checklists/<%= cl.id %>/observacoes" class="form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <textarea name="manager_notes" rows="3" maxlength="4000" placeholder="Pontos fortes, combinados da conversa de feedback, apoio que será dado"><%= cl.manager_notes || '' %></textarea>
+        <button class="btn btn-sm">Salvar observações</button>
+      </form>
+    <% } else if (seePlanAll || access.isEvaluator) { %>
+      <p><%= cl.manager_notes || 'Sem observações.' %></p>
+    <% } else { %>
+      <p class="muted">Visível após a liberação do resultado.</p>
+    <% } %>
+  </div>
+</section>
+
+<% if (isSelf) { %>
+<!-- Validação da autoverificação -->
+<section class="card" aria-labelledby="h-valid" id="validacao">
+  <h2 id="h-valid">Validação da autoverificação</h2>
+  <p class="muted">Este checklist é feito pelo próprio titular. Para fechar, precisa da validação de um terceiro escolhido pela administradora <strong>ou</strong> da ata da reunião da Diretoria anexada ao registro.</p>
+  <div class="grid grid-2">
+    <div>
+      <h3>Validador</h3>
+      <% if (sigs.validador) { %>
+        <p><span class="badge badge-success"><span aria-hidden="true">✓</span> Validado</span> por <strong><%= sigs.validador.signer_name %></strong> em <%= u.fmtDateTime(sigs.validador.signed_at) %></p>
+        <% if (sigs.validador.comment) { %><p class="quote"><%= sigs.validador.comment %></p><% } %>
+      <% } else { %>
+        <p><%= cl.validator_name ? cl.validator_name + ' (validação pendente)' : 'Ainda não definido.' %></p>
+      <% } %>
+      <% if (access.canSetValidator && !sigs.validador) { %>
+        <form method="post" action="/checklists/<%= cl.id %>/validador" class="inline-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="sr-only" for="validador-sel">Validador</label>
+          <select id="validador-sel" name="validator_user_id">
+            <option value="">— sem validador —</option>
+            <% candidates.forEach(function (p) { %><option value="<%= p.id %>" <%= cl.validator_user_id === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+          </select>
+          <button class="btn btn-sm">Definir validador</button>
+        </form>
+      <% } %>
+      <% if (access.canValidate && !sigs.validador) { %>
+        <% if (gestorSt === 'enviada') { %>
+          <form method="post" action="/checklists/<%= cl.id %>/assinar" class="sign-form">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <input type="hidden" name="role" value="validador">
+            <label class="field"><span>Parecer (opcional)</span><textarea name="comentario" rows="2" maxlength="2000"></textarea></label>
+            <label class="check"><input type="checkbox" name="ciente" value="1" required> Revisei as notas, as evidências e o plano de ação e valido esta autoverificação.</label>
+            <% if (!impersonating) { %><label class="field"><span>Sua senha</span><input type="password" name="senha" autocomplete="current-password" required></label><% } %>
+            <button class="btn btn-primary">Validar eletronicamente</button>
+          </form>
+          <p class="muted small">Se não concordar com alguma nota, não valide: registre a divergência com a administradora, que pode reabrir a autoverificação.</p>
+        <% } else { %>
+          <p class="muted">A validação fica disponível quando a autoverificação for enviada.</p>
+        <% } %>
+      <% } %>
+    </div>
+    <div>
+      <h3>Ata da Diretoria</h3>
+      <% if (ata.length) { %>
+        <ul class="attach-list">
+          <% ata.forEach(function (f) { %>
+            <li><a href="/anexos/<%= f.id %>">📎 <%= f.original_name %></a> <span class="muted small">· <%= f.uploaded_by_name %>, <%= u.fmtDateTime(f.uploaded_at) %></span>
+              <% if (access.isAdmin && cl.status !== 'assinada') { %>
+                <form method="post" action="/anexos/<%= f.id %>/excluir" class="inline-form" data-confirm="Remover a ata?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linklike danger">remover</button></form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else { %><p>Nenhuma ata anexada.</p><% } %>
+      <% if (access.canUploadAta) { %>
+        <form method="post" action="/checklists/<%= cl.id %>/ata" enctype="multipart/form-data" class="inline-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="file" name="arquivo" required accept=".pdf,.png,.jpg,.jpeg,.doc,.docx">
+          <button class="btn btn-sm">Anexar ata</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<!-- Assinaturas -->
+<section class="card" aria-labelledby="h-assin" id="assinaturas">
+  <h2 id="h-assin">Assinaturas</h2>
+  <p class="muted">O checklist só fecha com <%= isSelf ? 'a assinatura do titular e a validação (ou a ata)' : 'as duas assinaturas: colaborador e gestor' %>. A assinatura eletrônica registra nome, data e hora.</p>
+  <ul class="reqs">
+    <% requirements.forEach(function (r) { %>
+      <li class="<%= r.ok ? 'ok' : '' %>"><span aria-hidden="true"><%= r.ok ? '✓' : '○' %></span> <%= r.text %></li>
+    <% }) %>
+  </ul>
+  <div class="sig-boxes">
+    <% var roles = isSelf ? [['colaborador', 'Titular (' + cl.user_name + ')']] : [['colaborador', 'Colaborador (' + cl.user_name + ')'], ['gestor', 'Gestor (' + cl.evaluator_name + ')']]; %>
+    <% roles.forEach(function (r) { var s = sigs[r[0]]; %>
+      <div class="sig-box <%= s ? 'signed' : '' %>">
+        <div class="sig-role"><%= r[1] %></div>
+        <% if (s) { %>
+          <div class="sig-name"><span aria-hidden="true">✓</span> <%= s.signer_name %></div>
+          <div class="sig-when">Assinado em <%= u.fmtDateTime(s.signed_at) %></div>
+          <% if (s.impersonated_by) { %><div class="small muted">Assinatura de teste (registrada pela administradora)</div><% } %>
+          <% if (s.comment) { %><p class="quote"><%= s.comment %></p><% } %>
+          <% if (s.user_id === user.id && cl.status !== 'assinada') { %>
+            <form method="post" action="/checklists/<%= cl.id %>/retirar-assinatura" class="inline-form" data-confirm="Retirar a sua assinatura?">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="role" value="<%= r[0] %>">
+              <button class="linklike">Retirar assinatura</button>
+            </form>
+          <% } %>
+        <% } else { %>
+          <div class="sig-pending">Pendente</div>
+        <% } %>
+      </div>
+    <% }) %>
+    <% if (isSelf) { %>
+      <div class="sig-box <%= sigs.validador || ata.length ? 'signed' : '' %>">
+        <div class="sig-role">Validação por terceiro ou ata</div>
+        <% if (sigs.validador) { %>
+          <div class="sig-name"><span aria-hidden="true">✓</span> <%= sigs.validador.signer_name %></div>
+          <div class="sig-when">Validado em <%= u.fmtDateTime(sigs.validador.signed_at) %></div>
+        <% } else if (ata.length) { %>
+          <div class="sig-name"><span aria-hidden="true">✓</span> Ata da Diretoria anexada</div>
+          <div class="sig-when"><%= u.fmtDateTime(ata[0].uploaded_at) %></div>
+        <% } else { %>
+          <div class="sig-pending">Pendente · <a href="#validacao">ver validação</a></div>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+
+  <%
+    var myRole = null;
+    if (access.canSignAsEmployee && !sigs.colaborador) myRole = 'colaborador';
+    else if (access.canSignAsManager && !sigs.gestor) myRole = 'gestor';
+    var ready = requirements.every(function (r) { return r.ok; });
+  %>
+  <% if (myRole) { %>
+    <% if (ready) { %>
+      <form method="post" action="/checklists/<%= cl.id %>/assinar" class="sign-form card-inset">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="role" value="<%= myRole %>">
+        <h3>Assinar como <%= myRole === 'colaborador' ? (isSelf ? 'titular' : 'colaborador') : 'gestor' %></h3>
+        <% if (myRole === 'colaborador') { %>
+          <label class="field"><span>Comentário (opcional)</span><textarea name="comentario" rows="2" maxlength="2000" placeholder="Se quiser, registre a sua concordância ou divergência"></textarea></label>
+        <% } %>
+        <label class="check"><input type="checkbox" name="ciente" value="1" required> Li este checklist (níveis exigidos e verificados, evidências e plano de ação) e confirmo eletronicamente.</label>
+        <% if (!impersonating) { %>
+          <label class="field"><span>Sua senha</span><input type="password" name="senha" autocomplete="current-password" required></label>
+        <% } else { %>
+          <p class="muted small">Modo de teste: a senha não é pedida quando a administradora assina como outra pessoa.</p>
+        <% } %>
+        <button class="btn btn-primary">Assinar eletronicamente</button>
+      </form>
+    <% } else { %>
+      <p class="muted">A sua assinatura fica disponível quando todos os requisitos acima estiverem cumpridos.</p>
+    <% } %>
+  <% } %>
+</section>
+
+<% if (access.isAdmin) { %>
+<!-- Administração -->
+<section class="card admin-box" aria-labelledby="h-admin" id="admin">
+  <h2 id="h-admin">Administração deste checklist</h2>
+  <div class="grid grid-2">
+    <div>
+      <h3>Reabrir avaliação</h3>
+      <% if (access.canReopen && (autoSt === 'enviada' || gestorSt === 'enviada')) { %>
+        <form method="post" action="/checklists/<%= cl.id %>/reabrir" class="form" data-confirm="Reabrir a avaliação? As assinaturas serão removidas e o resultado voltará a ficar oculto.">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="field"><span>Qual avaliação</span>
+            <select name="kind">
+              <% if (!isSelf && autoSt === 'enviada') { %><option value="auto">Autoavaliação</option><% } %>
+              <% if (gestorSt === 'enviada') { %><option value="gestor"><%= isSelf ? 'Autoverificação' : 'Avaliação do gestor' %></option><% } %>
+            </select>
+          </label>
+          <label class="field"><span>Motivo</span><input name="motivo" required maxlength="1000"></label>
+          <button class="btn btn-sm">Reabrir</button>
+        </form>
+      <% } else { %><p class="muted">Nenhuma avaliação enviada para reabrir.</p><% } %>
+    </div>
+    <div>
+      <h3>Histórico (log)</h3>
+      <% if (!history.length) { %><p class="muted">Sem registros.</p><% } else { %>
+        <ul class="history">
+          <% history.forEach(function (h) { %>
+            <li><span class="muted small"><%= u.fmtDateTime(h.at) %></span> · <strong><%= h.acting_name ? h.acting_name + ' (via ' + h.user_name + ')' : (h.user_name || 'Sistema') %></strong> — <%= ACTIONS[h.action] || h.action %></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </div>
+</section>
+<% } %>
+<%- include('../partials/footer') %>

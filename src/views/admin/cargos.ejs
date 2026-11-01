@@ -1,0 +1,31 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › Cargos</p>
+<div class="page-head"><div><h1>Cargos</h1><p class="lead">A competência C10 (Gestão de equipe) se aplica às lideranças. O nível exigido de cada cargo é definido na matriz.</p></div></div>
+<section class="card">
+  <% cargos.forEach(function (c) { var holders = vincs.filter(function (v) { return v.cargo_id === c.id; }).map(function (v) { return v.user_name; }); %>
+    <form method="post" action="/admin/cargos/<%= c.id %>" class="form cargo-row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="code-big small"><%= c.code %></div>
+      <label class="field"><span>Nome do cargo</span><input name="title" value="<%= c.title %>" required maxlength="120"></label>
+      <label class="field"><span>Nome curto</span><input name="short_title" value="<%= c.short_title %>" maxlength="60"></label>
+      <label class="field"><span>Área</span><input name="area" value="<%= c.area %>" maxlength="80" list="areas-list"></label>
+      <label class="check"><input type="checkbox" name="is_leadership" value="1" <%= c.is_leadership ? 'checked' : '' %>> Liderança</label>
+      <div class="cargo-holders muted small"><%= holders.join(', ') || 'Sem ocupante' %></div>
+      <button class="btn btn-sm">Salvar</button>
+    </form>
+  <% }) %>
+  <datalist id="areas-list"><% [...new Set(cargos.map(function (c) { return c.area; }))].forEach(function (a) { %><option value="<%= a %>"><% }) %></datalist>
+</section>
+<section class="card">
+  <h2>Novo cargo</h2>
+  <form method="post" action="/admin/cargos/novo" class="form form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Código</span><input name="code" placeholder="F17" required pattern="[A-Za-z][0-9]{2,3}"></label>
+    <label class="field"><span>Nome do cargo</span><input name="title" required maxlength="120"></label>
+    <label class="field"><span>Nome curto</span><input name="short_title" maxlength="60"></label>
+    <label class="field"><span>Área</span><input name="area" maxlength="80" list="areas-list"></label>
+    <label class="check"><input type="checkbox" name="is_leadership" value="1"> Liderança</label>
+    <div class="span-full"><button class="btn btn-primary">Criar cargo</button></div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

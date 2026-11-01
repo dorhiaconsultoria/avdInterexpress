@@ -1,0 +1,242 @@
+-- Verificação de Competências InterExpress — esquema do banco (SQLite)
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
+-- Pessoas (usuários do sistema)
+CREATE TABLE IF NOT EXISTS users (
+  id                 INTEGER PRIMARY KEY,
+  name               TEXT NOT NULL,
+  email              TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash      TEXT,
+  must_change_password INTEGER NOT NULL DEFAULT 0,
+  is_admin           INTEGER NOT NULL DEFAULT 0,  -- Administradora (dona do processo)
+  is_rh              INTEGER NOT NULL DEFAULT 0,  -- Execução do ciclo (RH)
+  is_ceo             INTEGER NOT NULL DEFAULT 0,  -- Relatório geral da empresa
+  is_sgi             INTEGER NOT NULL DEFAULT 0,  -- Consulta do SGI (somente leitura)
+  active             INTEGER NOT NULL DEFAULT 1,
+  invite_token_hash  TEXT,
+  invite_expires     TEXT,
+  invited_at         TEXT,
+  reset_token_hash   TEXT,
+  reset_expires      TEXT,
+  last_login_at      TEXT,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id                TEXT PRIMARY KEY,           -- hash SHA-256 do token do cookie
+  user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  acting_as_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  csrf              TEXT NOT NULL,
+  flash             TEXT,
+  created_at        TEXT NOT NULL,
+  expires_at        TEXT NOT NULL
+);
+
+-- Cargos (funções)
+CREATE TABLE IF NOT EXISTS cargos (
+  id            INTEGER PRIMARY KEY,
+  code          TEXT NOT NULL UNIQUE,     -- F01, F02...
+  title         TEXT NOT NULL,
+  short_title   TEXT NOT NULL,
+  area          TEXT NOT NULL,
+  is_leadership INTEGER NOT NULL DEFAULT 0,
+  sort          INTEGER NOT NULL DEFAULT 0
+);
+
+-- Vínculo colaborador + cargo, com o vínculo do gestor imediato (hierarquia)
+CREATE TABLE IF NOT EXISTS vinculos (
+  id                 INTEGER PRIMARY KEY,
+  user_id            INTEGER NOT NULL REFERENCES users(id),
+  cargo_id           INTEGER NOT NULL REFERENCES cargos(id),
+  manager_vinculo_id INTEGER REFERENCES vinculos(id),
+  active             INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (user_id, cargo_id)
+);
+
+-- Matriz de competências com controle de versão
+CREATE TABLE IF NOT EXISTS matrix_versions (
+  id           INTEGER PRIMARY KEY,
+  number       INTEGER,                    -- nulo enquanto rascunho
+  version_date TEXT,
+  status       TEXT NOT NULL,              -- rascunho | vigente | substituida
+  notes        TEXT,
+  created_by   INTEGER REFERENCES users(id),
+  created_at   TEXT NOT NULL,
+  published_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS competencies (
+  id              INTEGER PRIMARY KEY,
+  version_id      INTEGER NOT NULL REFERENCES matrix_versions(id) ON DELETE CASCADE,
+  code            TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  definition      TEXT NOT NULL,
+  n1              TEXT NOT NULL,
+  n2              TEXT NOT NULL,
+  n3              TEXT NOT NULL,
+  leadership_only INTEGER NOT NULL DEFAULT 0,
+  sort            INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (version_id, code)
+);
+
+CREATE TABLE IF NOT EXISTS matrix_levels (
+  version_id      INTEGER NOT NULL REFERENCES matrix_versions(id) ON DELETE CASCADE,
+  cargo_id        INTEGER NOT NULL REFERENCES cargos(id),
+  competency_code TEXT NOT NULL,
+  required_level  INTEGER,                 -- NULL = não se aplica ao cargo
+  PRIMARY KEY (version_id, cargo_id, competency_code)
+);
+
+-- Ciclos de verificação
+CREATE TABLE IF NOT EXISTS cycles (
+  id                INTEGER PRIMARY KEY,
+  name              TEXT NOT NULL,
+  year              INTEGER NOT NULL,
+  status            TEXT NOT NULL,         -- planejamento | em_andamento | encerrado
+  matrix_version_id INTEGER REFERENCES matrix_versions(id),
+  start_date        TEXT,
+  self_deadline     TEXT,
+  manager_deadline  TEXT,
+  feedback_deadline TEXT,
+  end_date          TEXT,
+  auto_release      INTEGER NOT NULL DEFAULT 0,
+  reminder_days     INTEGER NOT NULL DEFAULT 3,
+  started_at        TEXT,
+  closed_at         TEXT,
+  created_at        TEXT NOT NULL
+);
+
+-- Checklist individual (uma verificação = colaborador + cargo no ciclo)
+CREATE TABLE IF NOT EXISTS checklists (
+  id                   INTEGER PRIMARY KEY,
+  cycle_id             INTEGER NOT NULL REFERENCES cycles(id),
+  vinculo_id           INTEGER NOT NULL REFERENCES vinculos(id),
+  user_id              INTEGER NOT NULL REFERENCES users(id),
+  cargo_id             INTEGER NOT NULL REFERENCES cargos(id),
+  evaluator_user_id    INTEGER REFERENCES users(id),
+  evaluator_vinculo_id INTEGER REFERENCES vinculos(id),
+  self_verification    INTEGER NOT NULL DEFAULT 0,
+  validator_user_id    INTEGER REFERENCES users(id),
+  status               TEXT NOT NULL DEFAULT 'nao_iniciada',
+  results_released_at  TEXT,
+  results_released_by  INTEGER REFERENCES users(id),
+  manager_notes        TEXT,
+  employee_comment     TEXT,
+  closed_at            TEXT,
+  created_at           TEXT NOT NULL,
+  UNIQUE (cycle_id, vinculo_id)
+);
+
+CREATE TABLE IF NOT EXISTS evaluations (
+  id                INTEGER PRIMARY KEY,
+  checklist_id      INTEGER NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
+  kind              TEXT NOT NULL,         -- auto | gestor
+  evaluator_user_id INTEGER NOT NULL REFERENCES users(id),
+  status            TEXT NOT NULL,         -- rascunho | enviada
+  started_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,
+  submitted_at      TEXT,
+  reopened_at       TEXT,
+  reopened_by       INTEGER REFERENCES users(id),
+  reopen_reason     TEXT,
+  UNIQUE (checklist_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS evaluation_items (
+  evaluation_id   INTEGER NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+  competency_code TEXT NOT NULL,
+  rating          INTEGER,
+  evidence        TEXT,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (evaluation_id, competency_code)
+);
+
+CREATE TABLE IF NOT EXISTS attachments (
+  id              INTEGER PRIMARY KEY,
+  checklist_id    INTEGER REFERENCES checklists(id) ON DELETE CASCADE,
+  evaluation_id   INTEGER REFERENCES evaluations(id) ON DELETE CASCADE,
+  competency_code TEXT,
+  kind            TEXT NOT NULL,           -- evidencia | ata
+  original_name   TEXT NOT NULL,
+  stored_name     TEXT NOT NULL,
+  mime            TEXT,
+  size            INTEGER,
+  uploaded_by     INTEGER REFERENCES users(id),
+  uploaded_at     TEXT NOT NULL
+);
+
+-- Plano de ação / PDI
+CREATE TABLE IF NOT EXISTS action_items (
+  id              INTEGER PRIMARY KEY,
+  checklist_id    INTEGER NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
+  origin          TEXT NOT NULL,           -- lacuna | livre
+  competency_code TEXT,
+  required_level  INTEGER,
+  verified_level  INTEGER,
+  category        TEXT,                    -- curso | mentoria | projeto | leitura | outro
+  action          TEXT,
+  responsible     TEXT,
+  due_date        TEXT,
+  status          TEXT NOT NULL DEFAULT 'nao_iniciada',
+  proposed_by     INTEGER REFERENCES users(id),
+  validated_by    INTEGER REFERENCES users(id),
+  validated_at    TEXT,
+  obsolete        INTEGER NOT NULL DEFAULT 0,
+  completed_at    TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS signatures (
+  id               INTEGER PRIMARY KEY,
+  checklist_id     INTEGER NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
+  role             TEXT NOT NULL,          -- colaborador | gestor | validador
+  user_id          INTEGER NOT NULL REFERENCES users(id),
+  signer_name      TEXT NOT NULL,
+  signed_at        TEXT NOT NULL,
+  comment          TEXT,
+  ip               TEXT,
+  impersonated_by  INTEGER REFERENCES users(id),
+  UNIQUE (checklist_id, role)
+);
+
+-- Log de acesso e alterações (LGPD)
+CREATE TABLE IF NOT EXISTS audit_log (
+  id                INTEGER PRIMARY KEY,
+  at                TEXT NOT NULL,
+  user_id           INTEGER,
+  acting_as_user_id INTEGER,
+  action            TEXT NOT NULL,
+  entity            TEXT,
+  entity_id         INTEGER,
+  subject_user_id   INTEGER,
+  details           TEXT,
+  ip                TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity, entity_id);
+
+-- Caixa de saída de e-mails (retidos no modo de teste)
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id         INTEGER PRIMARY KEY,
+  to_email   TEXT NOT NULL,
+  to_user_id INTEGER,
+  type       TEXT NOT NULL,
+  subject    TEXT NOT NULL,
+  html       TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  status     TEXT NOT NULL,                -- retido_teste | enviado | erro
+  error      TEXT,
+  created_at TEXT NOT NULL,
+  sent_at    TEXT
+);
+
+-- Controle de lembretes automáticos já enviados (evita duplicidade)
+CREATE TABLE IF NOT EXISTS reminders_sent (
+  key     TEXT PRIMARY KEY,
+  sent_at TEXT NOT NULL
+);

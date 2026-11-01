@@ -1,0 +1,85 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/">Início</a> › <a href="/checklists/<%= cl.id %>">Checklist de <%= cl.user_name %></a> › <%= evTitle %></p>
+<%- include('../partials/cl-header', { compact: true }) %>
+
+<div class="alert alert-info">
+  <% if (kind === 'auto') { %>
+    <strong>Autoavaliação.</strong> Escolha a nota que descreve o que você faz de fato e escreva uma evidência (fato observado) em cada competência. Ao lado de cada nota estão os critérios para ajudar na escolha.
+  <% } else if (cl.self_verification) { %>
+    <strong>Autoverificação.</strong> Como não há gestor acima deste cargo, você mesmo faz a verificação. Ela será validada por um terceiro escolhido pela administradora ou pela ata da Diretoria. Use evidências objetivas.
+  <% } else { %>
+    <strong>Avaliação do gestor.</strong> Avalie <%= cl.user_name %> pelo que você observou, com uma evidência em cada competência. O nível exigido aparece em cada item e a lacuna é calculada automaticamente. A autoavaliação fica visível depois que você enviar.
+  <% } %>
+</div>
+
+<div class="progress-sticky" data-progress>
+  <div class="progress-info">
+    <span><strong data-progress-done><%= progress.done %></strong> de <strong><%= progress.total %></strong> competências com nota e evidência</span>
+    <span class="save-state" data-save-state aria-live="polite"><%= evaluation.updated_at ? 'Rascunho salvo às ' + u.fmtTime(evaluation.updated_at) : '' %></span>
+  </div>
+  <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= progress.pct %>" aria-label="Progresso do preenchimento">
+    <span data-progress-bar style="width: <%= progress.pct %>%"></span>
+  </div>
+</div>
+
+<% if (evaluation.reopen_reason) { %>
+  <div class="alert alert-warn">Esta avaliação foi reaberta pela administradora em <%= u.fmtDateTime(evaluation.reopened_at) %>. Motivo: <%= evaluation.reopen_reason %></div>
+<% } %>
+
+<form method="post" action="/checklists/<%= cl.id %>/avaliar/<%= kind %>/salvar" class="eval-form"
+      data-autosave="/checklists/<%= cl.id %>/avaliar/<%= kind %>/rascunho"
+      data-upload="/checklists/<%= cl.id %>/avaliar/<%= kind %>/anexo"
+      data-show-required="<%= showRequired ? '1' : '0' %>">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <% comps.applicable.forEach(function (c, idx) {
+       var it = evaluation.items[c.code] || {};
+       var atts = attachments.filter(function (a) { return a.competency_code === c.code; }); %>
+    <article class="card comp" id="<%= c.code %>" data-code="<%= c.code %>" data-required="<%= c.required %>">
+      <header class="comp-head">
+        <div>
+          <span class="code"><%= c.code %></span>
+          <h2><%= c.name %></h2>
+        </div>
+        <% if (showRequired) { %>
+          <div class="comp-req">
+            <span class="req-label">Nível exigido</span> <%- u.levelChip(c.required) %>
+            <span class="gap-live" data-gap><%- u.gapBadge(c.required, it.rating) %></span>
+          </div>
+        <% } %>
+      </header>
+      <p class="comp-def"><%= c.definition %></p>
+      <fieldset class="scale">
+        <legend><%= kind === 'auto' ? 'Sua nota' : 'Nota' %> para <%= c.name %></legend>
+        <% [1,2,3].forEach(function (n) { var crit = n === 1 ? c.n1 : (n === 2 ? c.n2 : c.n3); %>
+          <label class="opt opt-<%= n %>">
+            <input type="radio" name="rating_<%= c.code %>" value="<%= n %>" <%= it.rating === n ? 'checked' : '' %>>
+            <span class="opt-n"><%= n %></span>
+            <span class="opt-body"><span class="opt-t"><%= u.LEVEL_LABELS[n] %></span><span class="opt-d"><%= crit %></span></span>
+          </label>
+        <% }) %>
+      </fieldset>
+      <label class="field">
+        <span>Evidência <em class="req-mark">(obrigatória)</em></span>
+        <textarea name="evidence_<%= c.code %>" rows="3" maxlength="4000" placeholder="Fato observado: o que aconteceu, quando e qual foi o resultado. Ex.: em out/2026 emitiu 120 notas sem retrabalho."><%= it.evidence || '' %></textarea>
+      </label>
+      <div class="attach" data-attach>
+        <ul class="attach-list" data-attach-list>
+          <% atts.forEach(function (a) { %>
+            <li data-attach-id="<%= a.id %>"><a href="/anexos/<%= a.id %>"><%= a.original_name %></a> <button type="button" class="linklike danger" data-attach-remove="<%= a.id %>">remover</button></li>
+          <% }) %>
+        </ul>
+        <label class="file-btn">
+          <input type="file" data-attach-input data-code="<%= c.code %>" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ods,.msg,.eml">
+          <span aria-hidden="true">📎</span><span>Anexar arquivo (opcional, até 10 MB)</span>
+        </label>
+        <span class="attach-msg" data-attach-msg aria-live="polite"></span>
+      </div>
+    </article>
+  <% }) %>
+
+  <div class="form-actions sticky-actions">
+    <button class="btn" type="submit" name="salvar" value="1">Salvar rascunho</button>
+    <button class="btn btn-primary" type="submit" name="revisar" value="1">Revisar e enviar →</button>
+  </div>
+</form>
+<%- include('../partials/footer') %>

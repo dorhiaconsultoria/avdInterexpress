@@ -1,0 +1,33 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › Log de acesso</p>
+<div class="page-head"><div><h1>Log de acesso (LGPD)</h1><p class="lead">Quem viu ou alterou o quê e quando. Os registros não podem ser apagados pela tela.</p></div>
+<div class="actions"><a class="btn" href="/admin/log/exportar.xlsx?<%= new URLSearchParams(q).toString() %>">Exportar Excel</a></div></div>
+<form method="get" class="filters card">
+  <label class="field"><span>Quem fez</span><select name="pessoa"><option value="">Todos</option><% users.forEach(function (p) { %><option value="<%= p.id %>" <%= String(q.pessoa) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %></select></label>
+  <label class="field"><span>Titular dos dados</span><select name="titular"><option value="">Todos</option><% users.forEach(function (p) { %><option value="<%= p.id %>" <%= String(q.titular) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %></select></label>
+  <label class="field"><span>Ação</span><select name="acao"><option value="">Todas</option><% Object.keys(ACTIONS).forEach(function (k) { %><option value="<%= k %>" <%= q.acao === k ? 'selected' : '' %>><%= ACTIONS[k] %></option><% }) %></select></label>
+  <label class="field"><span>De</span><input type="date" name="de" value="<%= q.de || '' %>"></label>
+  <label class="field"><span>Até</span><input type="date" name="ate" value="<%= q.ate || '' %>"></label>
+  <div class="filters-actions"><button class="btn btn-primary">Filtrar</button><a class="btn btn-ghost" href="/admin/log">Limpar</a></div>
+</form>
+<p class="muted small"><%= total %> registro(s)<%= total > 500 ? ' — exibindo os 500 mais recentes; use a exportação para ver todos' : '' %>.</p>
+<section class="card flush">
+  <div class="table-wrap">
+    <table class="table compact">
+      <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Titular dos dados</th><th>Registro</th><th>Detalhes</th></tr></thead>
+      <tbody>
+        <% rows.forEach(function (r) { %>
+          <tr>
+            <td class="nowrap small"><%= u.fmtDateTime(r.at) %></td>
+            <td><%= r.acting_name ? r.acting_name + ' (via ' + r.user_name + ')' : (r.user_name || 'Sistema') %></td>
+            <td><%= ACTIONS[r.action] || r.action %></td>
+            <td><%= r.subject_name || '—' %></td>
+            <td class="small"><% if (r.entity === 'checklist') { %><a href="/checklists/<%= r.entity_id %>">Checklist <%= r.entity_id %></a><% } else { %><%= r.entity ? r.entity + ' ' + (r.entity_id || '') : '—' %><% } %></td>
+            <td class="small muted break"><%= r.details || '' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('../partials/footer') %>

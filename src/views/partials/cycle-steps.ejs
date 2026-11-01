@@ -1,0 +1,8 @@
+<% /* Linha do tempo do ciclo. Espera: cycle */ %>
+<ol class="timeline">
+  <li><span class="tl-label">Início</span><span class="tl-date"><%= u.fmtDate(cycle.start_date) %></span></li>
+  <li><span class="tl-label">Autoavaliação</span><span class="tl-date">até <%= u.fmtDate(cycle.self_deadline) %></span></li>
+  <li><span class="tl-label">Avaliação do gestor</span><span class="tl-date">até <%= u.fmtDate(cycle.manager_deadline) %></span></li>
+  <li><span class="tl-label">Plano de ação e assinaturas</span><span class="tl-date">até <%= u.fmtDate(cycle.feedback_deadline) %></span></li>
+  <li><span class="tl-label">Encerramento</span><span class="tl-date"><%= u.fmtDate(cycle.end_date) %></span></li>
+</ol>

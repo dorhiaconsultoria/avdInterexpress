@@ -1,0 +1,70 @@
+<%- include('../partials/header') %>
+<div class="page-head"><div><h1>Ciclo</h1><p class="lead">Ciclo anual de verificação. A administradora define a data de início e os prazos de cada etapa.</p></div></div>
+<% if (!cycle) { %>
+  <section class="card"><p>Nenhum ciclo cadastrado.</p>
+    <form method="post" action="/admin/ciclo/novo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-primary">Criar ciclo</button></form></section>
+<% } else { %>
+<section class="card">
+  <div class="card-head">
+    <h2><%= cycle.name %></h2>
+    <span class="badge badge-<%= cycle.status === 'em_andamento' ? 'info' : (cycle.status === 'encerrado' ? 'success' : 'neutral') %>"><%= u.CYCLE_STATUS[cycle.status] %></span>
+  </div>
+  <dl class="kv kv-grid">
+    <div><dt>Verificações previstas</dt><dd><%= participants %></dd></div>
+    <div><dt>Matriz</dt><dd><%= cycle.matrix_version_id ? 'Travada no início do ciclo' : (version ? 'Versão ' + version.number + ' (vigente) será usada ao iniciar' : '—') %></dd></div>
+    <div><dt>Iniciado em</dt><dd><%= u.fmtDateTime(cycle.started_at) %></dd></div>
+  </dl>
+  <% if (cycle.status !== 'encerrado') { %>
+  <form method="post" action="/admin/ciclo/<%= cycle.id %>" class="form form-grid mt">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Nome do ciclo</span><input name="name" value="<%= cycle.name %>" required maxlength="80"></label>
+    <label class="field"><span>Data de início</span><input type="date" name="start_date" value="<%= cycle.start_date || '' %>"></label>
+    <label class="field"><span>Prazo da autoavaliação</span><input type="date" name="self_deadline" value="<%= cycle.self_deadline || '' %>"></label>
+    <label class="field"><span>Prazo da avaliação do gestor</span><input type="date" name="manager_deadline" value="<%= cycle.manager_deadline || '' %>"></label>
+    <label class="field"><span>Prazo do plano de ação e assinaturas</span><input type="date" name="feedback_deadline" value="<%= cycle.feedback_deadline || '' %>"></label>
+    <label class="field"><span>Encerramento</span><input type="date" name="end_date" value="<%= cycle.end_date || '' %>"></label>
+    <label class="field"><span>Lembrete de prazo próximo (dias antes)</span><input type="number" name="reminder_days" min="1" max="15" value="<%= cycle.reminder_days %>"></label>
+    <label class="check span-full"><input type="checkbox" name="auto_release" value="1" <%= cycle.auto_release ? 'checked' : '' %>> Liberar o resultado automaticamente quando as duas avaliações estiverem concluídas (se desmarcado, a administradora libera em Acompanhamento)</label>
+    <div class="span-full"><button class="btn btn-primary">Salvar ciclo</button></div>
+  </form>
+  <% } %>
+</section>
+
+<% if (cycle.status === 'planejamento') { %>
+<section class="card">
+  <h2>Iniciar o ciclo</h2>
+  <p>Ao iniciar: a matriz vigente (<%= version ? 'Versão ' + version.number : '—' %>) fica travada, os <%= participants %> checklists são abertos e todos recebem o aviso de abertura por e-mail<%= testMode ? ' (no modo de teste, o aviso fica retido na caixa de saída)' : ', com o convite para criar a senha quando a pessoa ainda não tiver acesso' %>.</p>
+  <% if (draft) { %><div class="alert alert-warn">Existe um rascunho da matriz não publicado. Ele não será usado neste ciclo, a menos que você o publique antes.</div><% } %>
+  <form method="post" action="/admin/ciclo/<%= cycle.id %>/iniciar" data-confirm="Iniciar o <%= cycle.name %>? A matriz ficará travada.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <button class="btn btn-accent btn-lg">Iniciar <%= cycle.name %></button>
+  </form>
+</section>
+<% } else if (cycle.status === 'em_andamento') { %>
+<section class="card">
+  <h2>Encerrar o ciclo</h2>
+  <p>Encerre depois que todos os checklists estiverem assinados. Os registros continuam disponíveis para consulta e auditoria, e o acompanhamento das ações segue no ciclo seguinte. A matriz é destravada.</p>
+  <form method="post" action="/admin/ciclo/<%= cycle.id %>/encerrar" class="form inline-fields">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Digite ENCERRAR para confirmar</span><input name="confirmacao" autocomplete="off" required></label>
+    <button class="btn btn-danger">Encerrar ciclo</button>
+  </form>
+</section>
+<% } else { %>
+<section class="card">
+  <h2>Próximo ciclo</h2>
+  <p>Crie o próximo ciclo anual. As datas são sugeridas um ano após as do ciclo anterior.</p>
+  <form method="post" action="/admin/ciclo/novo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-primary">Criar próximo ciclo</button></form>
+</section>
+<% } %>
+<% } %>
+
+<% if (cycles.length > 1) { %>
+<section class="card">
+  <h2>Histórico de ciclos</h2>
+  <ul class="plain list-lines">
+    <% cycles.forEach(function (c) { %><li><strong><%= c.name %></strong> · <%= u.CYCLE_STATUS[c.status] %> · <%= u.fmtDate(c.start_date) %> a <%= u.fmtDate(c.end_date) %></li><% }) %>
+  </ul>
+</section>
+<% } %>
+<%- include('../partials/footer') %>

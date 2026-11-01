@@ -1,0 +1,26 @@
+<% /* Cabeçalho do checklist com a hierarquia. Espera: cl, cycle, comps, ata, compact */ %>
+<section class="card cl-header <%= typeof compact !== 'undefined' && compact ? 'compact' : '' %>">
+  <div class="cl-header-main">
+    <div class="code-big" aria-label="Código do cargo"><%= cl.cargo_code %></div>
+    <div class="cl-header-who">
+      <div class="eyebrow">Checklist individual · <%= cycle.name %></div>
+      <h1><%= cl.user_name %></h1>
+      <p class="muted"><%= cl.cargo_title %> · <%= cl.area %></p>
+    </div>
+    <div class="cl-header-status"><%- u.statusBadge(cl.status) %></div>
+  </div>
+  <dl class="kv kv-grid">
+    <div><dt>Colaborador</dt><dd><%= cl.user_name %></dd></div>
+    <div><dt>Cargo · código</dt><dd><%= cl.cargo_title %> · <%= cl.cargo_code %></dd></div>
+    <div><dt>Gestor avaliador</dt><dd><%= cl.self_verification ? 'Autoverificação, validada por terceiro' : (cl.evaluator_name + (cl.evaluator_cargo_short ? ' (' + cl.evaluator_cargo_short + ')' : '')) %></dd></div>
+    <% if (cl.self_verification) { %>
+      <div><dt>Validação</dt><dd>
+        <% if (cl.validator_name) { %>Validador: <%= cl.validator_name %><% } else { %>Validador a definir<% } %>
+        <% if (ata && ata.length) { %> · Ata da Diretoria anexada<% } %>
+      </dd></div>
+    <% } %>
+    <div><dt>Ciclo</dt><dd><%= cycle.name %> (<%= u.CYCLE_STATUS[cycle.status] %>) · <%= u.fmtDate(cycle.start_date) %> a <%= u.fmtDate(cycle.end_date) %></dd></div>
+    <div><dt>Prazos</dt><dd>Autoavaliação <%= u.fmtDate(cycle.self_deadline) %> · Gestor <%= u.fmtDate(cycle.manager_deadline) %> · Plano e assinaturas <%= u.fmtDate(cycle.feedback_deadline) %></dd></div>
+    <div><dt>Matriz</dt><dd><%= comps.version ? 'Versão ' + comps.version.number + ' de ' + u.fmtDate(comps.version.version_date) : '—' %></dd></div>
+  </dl>
+</section>

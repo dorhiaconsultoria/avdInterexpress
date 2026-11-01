@@ -1,0 +1,104 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Acompanhamento do ciclo</h1>
+    <p class="lead"><%= cycle ? cycle.name + ' · ' + u.CYCLE_STATUS[cycle.status] : 'Sem ciclo' %></p>
+  </div>
+  <% if (user.is_admin && readyToRelease) { %>
+    <form method="post" action="/acompanhamento/liberar-todos" data-confirm="Liberar os <%= readyToRelease %> resultado(s) prontos? Cada colaborador receberá um aviso.">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn btn-accent">Liberar <%= readyToRelease %> resultado(s) prontos</button>
+    </form>
+  <% } %>
+</div>
+<div class="alert alert-info">
+  <strong>Orientação:</strong> acompanhe as pendências de cada pessoa e envie lembretes. Aqui aparecem apenas os status (sem notas).
+  <% if (user.is_rh && !user.is_admin) { %>Você pode consultar e baixar o registro de um checklist depois que o resultado for liberado.<% } %>
+  <% if (testMode) { %> No modo de teste, os lembretes ficam retidos na caixa de saída.<% } %>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-value"><%= coverage.previstas %></div><div class="stat-label">verificações previstas</div></div>
+  <div class="stat"><div class="stat-value"><%= coverage.autoEnviadas %>/<%= coverage.autoEsperadas %></div><div class="stat-label">autoavaliações enviadas</div></div>
+  <div class="stat"><div class="stat-value"><%= coverage.gestorEnviadas %>/<%= coverage.previstas %></div><div class="stat-label">avaliações do gestor / autoverificações</div></div>
+  <div class="stat stat-accent"><div class="stat-value"><%= u.fmtPct(coverage.cobertura) %></div><div class="stat-label">cobertura (realizadas)</div></div>
+  <div class="stat"><div class="stat-value"><%= coverage.assinados %></div><div class="stat-label">assinados</div></div>
+</div>
+
+<section class="card" aria-labelledby="h-pend">
+  <h2 id="h-pend">Pendências por pessoa</h2>
+  <% if (!groups.length && !adminPend.length) { %>
+    <p class="empty"><span aria-hidden="true">✓</span> Nenhuma pendência<%= cycle && cycle.status !== 'em_andamento' ? ' (o ciclo não está em andamento)' : '' %>.</p>
+  <% } else { %>
+    <form method="post" action="/acompanhamento/lembretes">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th class="w-check"><span class="sr-only">Selecionar</span></th><th>Pessoa</th><th>Pendências</th><th>Prazo mais próximo</th><th>Último lembrete</th></tr></thead>
+          <tbody>
+            <% groups.forEach(function (g) { var prazo = g.items.map(function (i) { return i.deadline; }).filter(Boolean).sort()[0]; %>
+              <tr>
+                <td><input type="checkbox" name="user_ids" value="<%= g.userId %>" aria-label="Selecionar <%= g.userName %>"></td>
+                <td><strong><%= g.userName %></strong></td>
+                <td><ul class="plain"><% g.items.forEach(function (i) { %><li><%= i.text %></li><% }) %></ul></td>
+                <td class="nowrap"><%- u.deadline(prazo) %></td>
+                <td class="nowrap"><%= lastMap[g.userId] ? u.fmtDateTime(lastMap[g.userId]) : '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button class="btn" name="selecionados" value="1">Enviar lembrete aos selecionados</button>
+        <button class="btn btn-primary" name="todos" value="1" data-confirm="Enviar lembrete a todas as pessoas com pendência?">Enviar lembrete a todos com pendência</button>
+      </div>
+    </form>
+    <% if (adminPend.length) { %>
+      <h3 class="mt">Pendências da administradora</h3>
+      <ul class="tasklist">
+        <% adminPend.forEach(function (p) { %>
+          <li class="task"><div class="task-text"><%= p.text %></div><% if (user.is_admin) { %><a class="btn btn-sm" href="<%= p.href %>">Abrir</a><% } %></li>
+        <% }) %>
+      </ul>
+    <% } %>
+  <% } %>
+</section>
+
+<section class="card flush" aria-labelledby="h-status">
+  <h2 id="h-status" class="pad">Status de todos os checklists</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Cód.</th><th>Colaborador</th><th>Cargo</th><th>Avaliador</th><th>Autoavaliação</th><th>Gestor</th><th>Resultado</th><th>Plano</th><th>Assinaturas</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% rows.forEach(function (r) { var cl = r.cl; %>
+          <tr>
+            <td class="code"><%= cl.cargo_code %></td>
+            <td><strong><%= cl.user_name %></strong></td>
+            <td><%= cl.cargo_short %></td>
+            <td><%= r.evaluatorLabel %></td>
+            <td><%- cl.self_verification ? '<span class="muted">n/a</span>' : u.evalBadge(r.autoSent ? 'enviada' : (cl.status === 'nao_iniciada' ? 'pendente' : 'pendente')) %></td>
+            <td><%- u.evalBadge(r.gestorSent ? 'enviada' : 'pendente') %></td>
+            <td><%= cl.self_verification ? 'n/a' : (cl.results_released_at ? 'Liberado' : '—') %></td>
+            <td class="nowrap"><%= r.gestorSent ? r.plan.gapsDefined + '/' + r.plan.gaps : '—' %></td>
+            <td class="nowrap">
+              <% if (cl.self_verification) { %>
+                <span class="sig <%= r.sigs.colaborador ? 'ok' : '' %>"><%= r.sigs.colaborador ? '✓' : '○' %> Titular</span><br>
+                <span class="sig <%= r.sigs.validador || r.hasAta ? 'ok' : '' %>"><%= r.sigs.validador || r.hasAta ? '✓' : '○' %> Validação</span>
+              <% } else { %>
+                <span class="sig <%= r.sigs.colaborador ? 'ok' : '' %>"><%= r.sigs.colaborador ? '✓' : '○' %> Colab.</span><br>
+                <span class="sig <%= r.sigs.gestor ? 'ok' : '' %>"><%= r.sigs.gestor ? '✓' : '○' %> Gestor</span>
+              <% } %>
+            </td>
+            <td><%- u.statusBadge(cl.status) %></td>
+            <td class="right nowrap">
+              <% if (user.is_admin || cl.self_verification || cl.results_released_at || cl.status === 'assinada') { %>
+                <a class="btn btn-sm" href="/checklists/<%= cl.id %>">Abrir</a>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>
