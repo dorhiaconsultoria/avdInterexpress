@@ -1,0 +1,69 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › <a href="/admin/pessoas">Pessoas</a> › <%= person.name %></p>
+<div class="page-head"><div><h1><%= person.name %></h1><p class="lead"><%= person.email %></p></div></div>
+
+<% if (inviteLink) { %>
+  <div class="alert alert-warn">
+    <strong>Modo de teste:</strong> o convite não foi enviado por e-mail (ficou retido na caixa de saída). Se quiser que <%= person.name %> teste agora, envie este link manualmente (vale 7 dias):
+    <div class="copy-row"><input readonly value="<%= inviteLink %>" data-copy-src><button class="btn btn-sm" type="button" data-copy>Copiar</button></div>
+  </div>
+<% } %>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Dados e perfis</h2>
+    <form method="post" action="/admin/pessoas/<%= person.id %>" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="field"><span>Nome</span><input name="name" value="<%= person.name %>" required maxlength="120"></label>
+      <label class="field"><span>E-mail</span><input type="email" name="email" value="<%= person.email %>" required>
+        <% if (person.ficticio) { %><small class="hint">E-mail fictício do modo de teste. Substitua pelo e-mail real.</small><% } %></label>
+      <fieldset class="checks"><legend>Perfis especiais</legend>
+        <label class="check"><input type="checkbox" name="is_admin" value="1" <%= person.is_admin ? 'checked' : '' %>> Administradora (dona do processo)</label>
+        <label class="check"><input type="checkbox" name="is_rh" value="1" <%= person.is_rh ? 'checked' : '' %>> Execução do ciclo (RH): pendências, registros e lembretes</label>
+        <label class="check"><input type="checkbox" name="is_ceo" value="1" <%= person.is_ceo ? 'checked' : '' %>> Relatório geral da empresa (CEO)</label>
+        <label class="check"><input type="checkbox" name="is_sgi" value="1" <%= person.is_sgi ? 'checked' : '' %>> Consulta do SGI (somente indicadores, sem notas)</label>
+      </fieldset>
+      <p class="hint">Os perfis de colaborador e de avaliador vêm dos cargos e da hierarquia abaixo.</p>
+      <label class="check"><input type="checkbox" name="active" value="1" <%= person.active ? 'checked' : '' %>> Ativo</label>
+      <button class="btn btn-primary">Salvar</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Acesso</h2>
+    <p><%= person.password_hash ? 'Senha criada.' : 'Ainda sem senha.' %><% if (person.last_login_at) { %> Último acesso em <%= u.fmtDateTime(person.last_login_at) %>.<% } %></p>
+    <% if (person.invited_at) { %><p class="muted small">Último convite em <%= u.fmtDateTime(person.invited_at) %>.</p><% } %>
+    <form method="post" action="/admin/pessoas/<%= person.id %>/convite">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn"><%= testMode ? 'Gerar link de convite (teste)' : (person.password_hash ? 'Reenviar convite (nova senha)' : 'Enviar convite por e-mail') %></button>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Cargos e gestor imediato</h2>
+  <p class="muted">Ao mudar o gestor, os checklists ainda sem avaliação do gestor passam a ser avaliados pelo novo gestor. Quando o gestor é a própria pessoa (ou não há gestor), o checklist é de autoverificação validada por terceiro.</p>
+  <% vincs.forEach(function (v) { %>
+    <form method="post" action="/admin/vinculos/<%= v.id %>" class="form inline-fields vinc-row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="vinc-cargo"><span class="code"><%= v.cargo_code %></span> <strong><%= v.cargo_title %></strong></div>
+      <label class="field"><span>Gestor imediato</span>
+        <select name="manager_vinculo_id"><option value="">— topo (autoverificação)</option>
+          <% managers.forEach(function (m) { if (m.id === v.id) return; %><option value="<%= m.id %>" <%= v.manager_vinculo_id === m.id ? 'selected' : '' %>><%= m.user_name %> — <%= m.cargo_code %> <%= m.cargo_short %></option><% }) %>
+        </select>
+      </label>
+      <input type="hidden" name="active" value="">
+      <label class="check"><input type="checkbox" name="active" value="1" <%= v.active ? 'checked' : '' %>> Ativo</label>
+      <button class="btn btn-sm">Salvar</button>
+    </form>
+  <% }) %>
+  <details class="mt">
+    <summary class="btn btn-sm">+ Incluir outro cargo para <%= person.name %></summary>
+    <form method="post" action="/admin/pessoas/<%= person.id %>/vinculos" class="form inline-fields">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="field"><span>Cargo</span><select name="cargo_id" required><option value="">—</option><% cargos.forEach(function (c) { %><option value="<%= c.id %>"><%= c.code %> — <%= c.title %></option><% }) %></select></label>
+      <label class="field"><span>Gestor imediato</span><select name="manager_vinculo_id"><option value="">— topo (autoverificação)</option><% managers.forEach(function (m) { %><option value="<%= m.id %>"><%= m.user_name %> — <%= m.cargo_code %></option><% }) %></select></label>
+      <button class="btn btn-sm btn-primary">Incluir</button>
+    </form>
+  </details>
+</section>
+<%- include('../partials/footer') %>

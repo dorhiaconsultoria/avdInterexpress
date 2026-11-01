@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="<%= csrf %>">
+  <title><%= title ? title + ' · ' : '' %>Verificação de Competências · InterExpress</title>
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+<% if (testMode) { %>
+  <div class="testbar" role="status">
+    <div class="wrap testbar-inner">
+      <span class="testbar-label"><strong>MODO DE TESTE</strong> · nenhum e-mail é enviado</span>
+      <% if (realUser && realUser.is_admin && allUsers.length) { %>
+        <form method="post" action="/admin/entrar-como" class="testbar-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label for="entrar-como-sel">Entrar como</label>
+          <select id="entrar-como-sel" name="user_id" data-autosubmit>
+            <option value="">Escolha uma pessoa…</option>
+            <% allUsers.forEach(function (p) { %>
+              <option value="<%= p.id %>" <%= user && user.id === p.id ? 'selected' : '' %>><%= p.name %><%= p.id === realUser.id ? ' (você)' : '' %></option>
+            <% }) %>
+          </select>
+          <noscript><button class="btn btn-sm">Ir</button></noscript>
+        </form>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+<% if (impersonating) { %>
+  <div class="impbar" role="status">
+    <div class="wrap impbar-inner">
+      <span>Você está vendo o sistema como <strong><%= user.name %></strong>. Tudo o que fizer aqui fica registrado no log em seu nome.</span>
+      <form method="post" action="/admin/sair-entrar-como">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-sm btn-light">Voltar para a minha conta</button>
+      </form>
+    </div>
+  </div>
+<% } %>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="/" aria-label="Início">
+      <img src="<%= logoUrl %>" alt="InterExpress" class="brand-logo">
+      <span class="brand-sub">Verificação de<br>Competências</span>
+    </a>
+    <% if (user) { %>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mainnav" data-nav-toggle>
+        <span class="sr-only">Abrir menu</span><span class="nav-toggle-bar"></span>
+      </button>
+      <nav id="mainnav" class="mainnav" aria-label="Principal">
+        <ul>
+          <% nav.forEach(function (item) { var active = item.href === '/' ? path === '/' : path.indexOf(item.href) === 0; %>
+            <li><a href="<%= item.href %>" class="<%= active ? 'active' : '' %>" <%= active ? 'aria-current=page' : '' %>><%= item.label %></a></li>
+          <% }) %>
+        </ul>
+        <div class="usermenu">
+          <a href="/conta" class="usermenu-name" title="Minha conta"><span class="avatar" aria-hidden="true"><%= user.name.charAt(0) %></span><%= user.name %></a>
+          <form method="post" action="/logout">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="linklike">Sair</button>
+          </form>
+        </div>
+      </nav>
+    <% } %>
+  </div>
+</header>
+<main class="wrap main" id="conteudo">
+<% getFlash().forEach(function (f) { %>
+  <div class="alert alert-<%= f.type %>" role="<%= f.type === 'error' ? 'alert' : 'status' %>"><%= f.message %></div>
+<% }) %>

@@ -1,0 +1,29 @@
+<%
+  /* Nó do organograma. Folhas irmãs (sem subordinados) ficam empilhadas para a árvore caber na tela. */
+  var kids = node.children || [];
+  var leaves = kids.filter(function (c) { return !c.children.length; });
+  var branches = kids.filter(function (c) { return c.children.length; });
+  var allLeaves = kids.length >= 2 && leaves.length === kids.length;
+  var groupLeaves = !allLeaves && leaves.length >= 2;
+%>
+<li>
+  <div class="org-card <%= node.is_leadership ? 'lead' : '' %>">
+    <span class="org-code"><%= node.cargo_code %></span>
+    <strong class="org-name"><%= node.user_name %></strong>
+    <span class="org-role"><%= node.cargo_title %></span>
+  </div>
+  <% if (kids.length) { %>
+    <ul class="<%= allLeaves ? 'org-stack' : '' %>">
+      <% (groupLeaves ? branches : kids).forEach(function (child) { %>
+        <%- include('org-node', { node: child }) %>
+      <% }) %>
+      <% if (groupLeaves) { %>
+        <li class="org-group">
+          <ul class="org-stack">
+            <% leaves.forEach(function (child) { %><%- include('org-node', { node: child }) %><% }) %>
+          </ul>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+</li>

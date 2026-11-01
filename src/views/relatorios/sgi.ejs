@@ -1,0 +1,59 @@
+<%- include('../partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Indicadores do SGI</h1>
+    <p class="lead">Registro SGI E3.3.1 — item 7 · <%= cycle.name %></p>
+  </div>
+  <div class="actions">
+    <% if (cycles.length > 1) { %>
+      <form method="get" action="/sgi" class="inline-form">
+        <label class="sr-only" for="sgi-ciclo">Ciclo</label>
+        <select id="sgi-ciclo" name="ciclo" data-autosubmit><% cycles.forEach(function (c) { %><option value="<%= c.id %>" <%= c.id === cycle.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select>
+      </form>
+    <% } %>
+    <a class="btn btn-primary" href="/sgi/exportar.pdf?ciclo=<%= cycle.id %>">Baixar evidência em PDF</a>
+  </div>
+</div>
+<div class="alert alert-info">
+  Esta página comprova que a empresa <strong>define</strong> (matriz de competências por cargo), <strong>verifica</strong> (checklists com evidências e assinaturas) e <strong>desenvolve</strong> (plano de ação para cada lacuna) a competência exigida de cada função. É somente leitura e não mostra notas individuais.
+</div>
+
+<section class="card">
+  <h2>Cobertura</h2>
+  <div class="stats">
+    <div class="stat"><div class="stat-value"><%= coverage.previstas %></div><div class="stat-label">verificações previstas</div></div>
+    <div class="stat"><div class="stat-value"><%= coverage.realizadas %></div><div class="stat-label">realizadas</div></div>
+    <div class="stat stat-accent"><div class="stat-value"><%= u.fmtPct(coverage.cobertura) %></div><div class="stat-label">cobertura · meta 100%</div></div>
+    <div class="stat"><div class="stat-value"><%= coverage.assinados %></div><div class="stat-label">checklists assinados (<%= u.fmtPct(coverage.pctAssinados) %>)</div></div>
+  </div>
+  <div class="meter" role="img" aria-label="Cobertura <%= u.fmtPct(coverage.cobertura) %>"><span style="width: <%= Math.min(100, coverage.cobertura) %>%"></span></div>
+  <dl class="kv kv-grid mt">
+    <div><dt>Definição (matriz vigente no ciclo)</dt><dd><%= version ? 'Versão ' + version.number + ' de ' + u.fmtDate(version.version_date) : '—' %></dd></div>
+    <div><dt>Lacunas com ação, responsável e prazo</dt><dd><%= gaps.pctComAcao == null ? 'Sem lacunas registradas' : u.fmtPct(gaps.pctComAcao) %></dd></div>
+    <div><dt>Ações de lacuna concluídas</dt><dd><%= gaps.pctConcluidas == null ? '—' : u.fmtPct(gaps.pctConcluidas) %></dd></div>
+  </dl>
+</section>
+
+<section class="card flush">
+  <h2 class="pad">Status dos fechamentos</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Cód.</th><th>Colaborador</th><th>Cargo</th><th>Avaliador</th><th>Avaliações concluídas</th><th>Plano de ação completo</th><th>Assinado / validado</th><th>Fechado em</th></tr></thead>
+      <tbody>
+        <% rows.forEach(function (r) { %>
+          <tr>
+            <td class="code"><%= r.code %></td>
+            <td><%= r.colaborador %></td>
+            <td><%= r.cargo %></td>
+            <td><%= r.avaliador %></td>
+            <td><%- r.avaliacoes ? '<span class="badge badge-success"><span aria-hidden="true">✓</span> Sim</span>' : '<span class="badge badge-neutral">Não</span>' %></td>
+            <td><%- r.planoCompleto == null ? '<span class="muted">—</span>' : (r.planoCompleto ? '<span class="badge badge-success"><span aria-hidden="true">✓</span> Sim</span>' : '<span class="badge badge-warn">Não</span>') %></td>
+            <td><%- u.statusBadge(r.status) %><% if (r.selfVerification) { %><div class="small muted"><%= r.validacao %></div><% } %></td>
+            <td class="nowrap"><%= r.closedAt ? u.fmtDateTime(r.closedAt) : '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('../partials/footer') %>

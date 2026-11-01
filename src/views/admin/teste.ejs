@@ -1,0 +1,79 @@
+<%- include('../partials/header') %>
+<div class="page-head"><div><h1><%= testMode ? 'Modo de teste' : 'Sistema no ar' %></h1>
+<p class="lead"><%= testMode ? 'Teste e ajuste tudo antes de liberar para a empresa. Nenhum e-mail é enviado.' : 'No ar desde ' + u.fmtDateTime(wentLiveAt) + '.' %></p></div></div>
+
+<% if (testMode) { %>
+<section class="card" aria-labelledby="h-como">
+  <h2 id="h-como">Entrar como</h2>
+  <p class="muted">Veja exatamente a tela de cada pessoa. O que você fizer enquanto estiver "como" alguém fica registrado no log em seu nome. A senha não é pedida nas assinaturas de teste.</p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Pessoa</th><th>Cargo(s)</th><th>Perfis</th><th>E-mail</th><th></th></tr></thead>
+      <tbody>
+        <% people.forEach(function (p) { %>
+          <tr>
+            <td><strong><%= p.name %></strong></td>
+            <td class="code"><%= p.cargos || '—' %></td>
+            <td><%= p.perfis.join(' · ') %></td>
+            <td class="small"><%= p.email %></td>
+            <td class="right">
+              <% if (p.id !== realUser.id) { %>
+                <form method="post" action="/admin/entrar-como" class="inline-form">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="user_id" value="<%= p.id %>">
+                  <button class="btn btn-sm">Entrar como <%= p.name %></button>
+                </form>
+              <% } else { %><span class="muted small">você</span><% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Apagar avaliações de teste</h2>
+    <p>Apaga todas as avaliações, planos de ação, assinaturas, anexos e e-mails retidos (<%= evalCount %> avaliação(ões) hoje). <strong>Mantém</strong> cadastros, matriz e hierarquia. O ciclo volta para o planejamento e a matriz é destravada.</p>
+    <form method="post" action="/admin/teste/apagar" data-confirm="Apagar todas as avaliações de teste? Esta ação não pode ser desfeita.">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn btn-danger">Apagar avaliações de teste</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Recarregar exemplos</h2>
+    <p>Apaga as avaliações atuais e carrega 3 exemplos para ver o fluxo e os relatórios: <strong>Karine</strong> (assinado), <strong>Felipe</strong> (concluído, plano incompleto) e <strong>Lucas</strong> (autoavaliação enviada). O ciclo fica em andamento.</p>
+    <form method="post" action="/admin/teste/exemplos" data-confirm="Apagar as avaliações atuais e recarregar os exemplos?">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn">Recarregar avaliações de exemplo</button>
+    </form>
+  </section>
+</div>
+
+<section class="card golive" id="no-ar" aria-labelledby="h-noar">
+  <h2 id="h-noar">Colocar no ar</h2>
+  <p>Desativa o modo de teste. A partir daí os e-mails passam a ser enviados e os convites podem ser disparados. Ao colocar no ar:</p>
+  <ul>
+    <li>todas as avaliações de teste são apagadas (cadastros, matriz e hierarquia são mantidos);</li>
+    <li>o ciclo volta ao planejamento, para você confirmar as datas e iniciar: o início envia o aviso de abertura com o convite para criar a senha;</li>
+    <li>"Entrar como" deixa de funcionar e as senhas de teste das outras pessoas são invalidadas.</li>
+  </ul>
+  <h3>Verificação antes de colocar no ar</h3>
+  <ul class="reqs">
+    <% checks.forEach(function (c) { %>
+      <li class="<%= c.ok ? 'ok' : 'warn' %>"><span aria-hidden="true"><%= c.ok ? '✓' : '!' %></span> <%= c.text %> <% if (!c.ok && c.href) { %><a href="<%= c.href %>">Resolver</a><% } %></li>
+    <% }) %>
+  </ul>
+  <form method="post" action="/admin/colocar-no-ar" class="form golive-form" data-confirm="Colocar o sistema no ar? As avaliações de teste serão apagadas e o modo de teste não pode ser reativado pela tela.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Para confirmar, digite <strong>COLOCAR NO AR</strong></span><input name="confirmacao" autocomplete="off" required></label>
+    <button class="btn btn-accent btn-lg">Colocar no ar</button>
+  </form>
+</section>
+<% } else { %>
+<section class="card">
+  <h2>O sistema está no ar</h2>
+  <p>Os e-mails são enviados normalmente. Para iniciar o ciclo e disparar os convites, vá em <a href="/admin/ciclo">Ciclo</a>. Para reenviar convites, use <a href="/admin/pessoas">Pessoas</a>.</p>
+</section>
+<% } %>
+<%- include('../partials/footer') %>

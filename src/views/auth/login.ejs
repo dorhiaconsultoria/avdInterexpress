@@ -1,0 +1,25 @@
+<%- include('../partials/header') %>
+<section class="auth">
+  <div class="card auth-card">
+    <h1>Entrar</h1>
+    <p class="muted">Use o e-mail cadastrado pelo RH e a sua senha.</p>
+    <% if (error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/login" class="form">
+      <input type="hidden" name="voltar" value="<%= voltar %>">
+      <label class="field">
+        <span>E-mail</span>
+        <input type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus>
+      </label>
+      <label class="field">
+        <span>Senha</span>
+        <input type="password" name="senha" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-block">Entrar</button>
+    </form>
+    <p class="auth-links"><a href="/esqueci-senha">Esqueci minha senha</a></p>
+    <% if (testMode) { %>
+      <p class="hint">Ambiente em <strong>modo de teste</strong>. O acesso é da administradora; os demais perfis são testados pela opção "Entrar como".</p>
+    <% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

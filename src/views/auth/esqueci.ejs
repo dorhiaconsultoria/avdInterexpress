@@ -1,0 +1,19 @@
+<%- include('../partials/header') %>
+<section class="auth">
+  <div class="card auth-card">
+    <h1>Esqueci minha senha</h1>
+    <% if (sent) { %>
+      <div class="alert alert-success" role="status">Se o e-mail <strong><%= email %></strong> estiver cadastrado, você vai receber um link para criar uma nova senha. O link vale por 2 horas.</div>
+      <% if (testMode) { %><p class="hint">Modo de teste: o e-mail não é enviado. A administradora encontra a mensagem em Administração › E-mails.</p><% } %>
+      <p><a href="/login">Voltar para o login</a></p>
+    <% } else { %>
+      <p class="muted">Informe o seu e-mail. Vamos enviar um link para você criar uma nova senha.</p>
+      <form method="post" action="/esqueci-senha" class="form">
+        <label class="field"><span>E-mail</span><input type="email" name="email" required autofocus autocomplete="username"></label>
+        <button class="btn btn-primary btn-block">Enviar link</button>
+      </form>
+      <p class="auth-links"><a href="/login">Voltar para o login</a></p>
+    <% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

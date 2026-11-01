@@ -1,0 +1,26 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › E-mails</p>
+<div class="page-head"><div><h1>Caixa de saída de e-mails</h1>
+<p class="lead"><%= testMode ? 'Modo de teste: as mensagens ficam retidas aqui e não são enviadas.' : (smtp ? 'Envio pelo servidor ' + smtpHost + '.' : 'Servidor de e-mail não configurado.') %></p></div></div>
+<% if (!testMode && !smtp) { %><div class="alert alert-error">Configure as variáveis SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM no servidor para enviar e-mails.</div><% } %>
+<section class="card flush">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Data</th><th>Para</th><th>Tipo</th><th>Assunto</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+        <% if (!emails.length) { %><tr><td colspan="6" class="empty">Nenhuma mensagem.</td></tr><% } %>
+        <% emails.forEach(function (e) { %>
+          <tr>
+            <td class="nowrap small"><%= u.fmtDateTime(e.created_at) %></td>
+            <td class="small"><%= e.to_email %></td>
+            <td class="small"><%= e.type %></td>
+            <td><%= e.subject %></td>
+            <td><span class="badge badge-<%= e.status === 'enviado' ? 'success' : (e.status === 'erro' ? 'danger' : 'warn') %>"><%= EMAIL_STATUS[e.status] || e.status %></span><% if (e.error) { %><div class="small muted"><%= e.error %></div><% } %></td>
+            <td class="right"><a class="btn btn-sm" href="/admin/emails/<%= e.id %>">Ver</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('../partials/footer') %>

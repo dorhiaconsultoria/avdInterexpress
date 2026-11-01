@@ -1,0 +1,58 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/">Início</a> › <a href="/checklists/<%= cl.id %>">Checklist</a> › <%= kind === 'auto' ? 'Autoavaliação' : 'Autoverificação' %></p>
+<%- include('../partials/cl-header', { compact: true }) %>
+
+<section class="card">
+  <h2>Antes de começar: o que é esperado do seu cargo</h2>
+  <p>Esta é a tabela das competências do cargo <strong><%= cl.cargo_title %> (<%= cl.cargo_code %>)</strong> e o nível exigido em cada uma. O nível exigido vem da matriz de competências da empresa e não é alterado na avaliação.</p>
+  <div class="table-wrap">
+    <table class="table summary-table">
+      <thead><tr><th>Cód.</th><th>Competência</th><th>O que significa</th><th class="center">Nível exigido</th></tr></thead>
+      <tbody>
+        <% comps.applicable.forEach(function (c) { %>
+          <tr>
+            <td class="code"><%= c.code %></td>
+            <td><strong><%= c.name %></strong></td>
+            <td class="muted"><%= c.definition %></td>
+            <td class="center nowrap"><%- u.levelChip(c.required) %> <span class="lvl-label"><%= u.LEVEL_LABELS[c.required] %></span></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% if (comps.notApplicable.length) { %>
+    <h3 class="mt">Não se aplicam ao seu cargo</h3>
+    <ul class="chips">
+      <% comps.notApplicable.forEach(function (c) { %><li><span class="code"><%= c.code %></span> <%= c.name %></li><% }) %>
+    </ul>
+    <p class="muted">Essas competências não aparecem no seu checklist.</p>
+  <% } %>
+</section>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>A escala</h2>
+    <ul class="scale-legend">
+      <% [1,2,3].forEach(function (n) { %>
+        <li><%- u.levelChip(n) %><div><strong><%= u.LEVEL_LABELS[n] %></strong><br><span class="muted"><%= u.LEVEL_DESCRIPTIONS[n] %></span></div></li>
+      <% }) %>
+    </ul>
+    <p class="muted">A nota descreve o que você faz de fato, não uma impressão geral.</p>
+  </section>
+  <section class="card">
+    <h2>Como preencher</h2>
+    <ol class="steps compact">
+      <li>Leia a definição e os critérios de cada competência.</li>
+      <li>Escolha a nota que descreve o que você faz hoje.</li>
+      <li>Escreva uma <strong>evidência</strong>: um fato observado (o que, quando, resultado). Sem evidência, não é possível enviar. Se quiser, anexe um arquivo.</li>
+      <li>O sistema salva o rascunho automaticamente. Você pode parar e continuar depois.</li>
+      <li>No fim, revise e envie. Depois de enviada, só a administradora pode reabrir.</li>
+    </ol>
+  </section>
+</div>
+
+<form method="post" action="/checklists/<%= cl.id %>/avaliar/<%= kind %>/iniciar" class="center mt">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <button class="btn btn-primary btn-lg">Entendi, começar a <%= kind === 'auto' ? 'autoavaliação' : 'autoverificação' %></button>
+</form>
+<%- include('../partials/footer') %>

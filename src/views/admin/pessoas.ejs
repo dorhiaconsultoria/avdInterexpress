@@ -1,0 +1,82 @@
+<%- include('../partials/header') %>
+<div class="page-head">
+  <div><h1>Pessoas e hierarquia</h1><p class="lead">Cada verificação é por colaborador + cargo. O avaliador é o ocupante do cargo imediatamente acima.</p></div>
+  <div class="actions"><a class="btn" href="/organograma">Ver organograma</a></div>
+</div>
+
+<% if (resultado) { %>
+  <section class="card" id="importar-resultado">
+    <h2>Resultado da importação</h2>
+    <p><strong><%= resultado.atualizados.length %></strong> e-mail(s) atualizado(s) · <strong><%= resultado.erros.length %></strong> erro(s) · <%= resultado.ignorados.length %> linha(s) ignorada(s).</p>
+    <% if (resultado.erros.length) { %><div class="alert alert-error"><ul class="plain"><% resultado.erros.forEach(function (e) { %><li><%= e %></li><% }) %></ul></div><% } %>
+    <% if (resultado.atualizados.length) { %><details><summary>Ver atualizados</summary><ul class="plain"><% resultado.atualizados.forEach(function (e) { %><li><%= e %></li><% }) %></ul></details><% } %>
+  </section>
+<% } %>
+
+<section class="card flush">
+  <div class="card-head pad">
+    <h2>Cadastro</h2>
+    <% if (!testMode) { %>
+      <form method="post" action="/admin/convites" data-confirm="Enviar convite por e-mail a todos que ainda não criaram senha?">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm btn-primary">Enviar convites pendentes</button>
+      </form>
+    <% } else { %>
+      <span class="muted small">Convites por e-mail liberados depois de "Colocar no ar".</span>
+    <% } %>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Pessoa</th><th>E-mail</th><th>Cargo(s) · gestor imediato</th><th>Perfis especiais</th><th>Acesso</th><th></th></tr></thead>
+      <tbody>
+        <% people.forEach(function (p) { %>
+          <tr class="<%= p.active ? '' : 'row-muted' %>">
+            <td><strong><%= p.name %></strong><%= p.active ? '' : ' (inativo)' %></td>
+            <td class="small"><%= p.email %><% if (p.ficticio) { %> <span class="badge badge-warn">fictício</span><% } %></td>
+            <td class="small">
+              <% p.vincs.forEach(function (v) { %><div><span class="code"><%= v.cargo_code %></span> <%= v.cargo_short %> · <span class="muted"><%= v.manager_vinculo_id ? (v.manager_user_id === v.user_id ? 'autoverificação' : v.manager_name + ' (' + v.manager_cargo_code + ')') : 'topo — autoverificação' %></span></div><% }) %>
+              <%= p.vincs.length ? '' : '—' %>
+            </td>
+            <td class="small"><%= [p.is_admin ? 'Administradora' : '', p.is_rh ? 'RH (execução)' : '', p.is_ceo ? 'CEO' : '', p.is_sgi ? 'SGI' : ''].filter(Boolean).join(', ') || '—' %></td>
+            <td class="small"><%= p.acesso %></td>
+            <td class="right"><a class="btn btn-sm" href="/admin/pessoas/<%= p.id %>">Editar</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid grid-2">
+  <section class="card" id="importar">
+    <h2>Importar e-mails por planilha</h2>
+    <p class="muted">Baixe o modelo, preencha a coluna E-mail e envie. A pessoa é localizada pelo Código do cargo (ou pelo nome). Aceita .xlsx ou .csv.</p>
+    <p><a class="btn btn-sm" href="/admin/pessoas/modelo.xlsx">Baixar modelo (.xlsx)</a></p>
+    <form method="post" action="/admin/pessoas/importar" enctype="multipart/form-data" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="file" name="arquivo" accept=".xlsx,.csv" required>
+      <button class="btn btn-primary">Importar</button>
+    </form>
+  </section>
+  <section class="card" id="nova">
+    <h2>Incluir pessoa</h2>
+    <form method="post" action="/admin/pessoas/nova" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="field"><span>Nome</span><input name="name" required maxlength="120"></label>
+      <label class="field"><span>E-mail</span><input type="email" name="email" required></label>
+      <label class="field"><span>Cargo (opcional)</span>
+        <select name="cargo_id"><option value="">—</option><% cargos.forEach(function (c) { %><option value="<%= c.id %>"><%= c.code %> — <%= c.title %></option><% }) %></select>
+      </label>
+      <label class="field"><span>Gestor imediato</span>
+        <select name="manager_vinculo_id"><option value="">— (topo / autoverificação)</option><% vincs.forEach(function (v) { %><option value="<%= v.id %>"><%= v.user_name %> — <%= v.cargo_code %> <%= v.cargo_short %></option><% }) %></select>
+      </label>
+      <fieldset class="checks"><legend>Perfis especiais</legend>
+        <label class="check"><input type="checkbox" name="is_rh" value="1"> Execução do ciclo (RH)</label>
+        <label class="check"><input type="checkbox" name="is_ceo" value="1"> Relatório geral (CEO)</label>
+        <label class="check"><input type="checkbox" name="is_sgi" value="1"> Consulta do SGI</label>
+        <label class="check"><input type="checkbox" name="is_admin" value="1"> Administradora</label>
+      </fieldset>
+      <button class="btn btn-primary">Incluir</button>
+    </form>
+  </section>
+</div>
+<%- include('../partials/footer') %>

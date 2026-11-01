@@ -1,0 +1,82 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › <a href="/admin/matriz">Matriz</a> › Rascunho</p>
+<div class="page-head"><div><h1>Editar matriz — rascunho da Versão <%= nextNumber %></h1>
+<p class="lead">Baseado na <%= vigente ? 'Versão ' + vigente.number + ' de ' + u.fmtDate(vigente.version_date) : 'matriz atual' %>. Nada muda até você publicar.</p></div></div>
+<% if (locked) { %><div class="alert alert-warn">A matriz está travada porque o ciclo está em andamento. Você não pode salvar nem publicar agora.</div><% } %>
+
+<form method="post" action="/admin/matriz/rascunho" class="form">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <section class="card flush">
+    <h2 class="pad">Nível exigido por cargo</h2>
+    <div class="table-wrap">
+      <table class="table matrix edit">
+        <thead><tr><th>Cód.</th><th>Cargo</th><% comps.forEach(function (c) { %><th class="center" title="<%= c.name %>"><%= c.code %></th><% }) %></tr></thead>
+        <tbody>
+          <% cargos.forEach(function (cargo) { var lv = levels[cargo.id] || {}; %>
+            <tr>
+              <td class="code"><%= cargo.code %></td>
+              <td class="nowrap"><%= cargo.short_title %></td>
+              <% comps.forEach(function (c) { var val = lv[c.code]; %>
+                <td class="center">
+                  <label class="sr-only" for="l-<%= cargo.id %>-<%= c.code %>"><%= cargo.code %> <%= c.code %></label>
+                  <select id="l-<%= cargo.id %>-<%= c.code %>" name="lvl_<%= cargo.id %>_<%= c.code %>" class="lvl-select">
+                    <option value="" <%= val == null ? 'selected' : '' %>>—</option>
+                    <option value="1" <%= val === 1 ? 'selected' : '' %>>1</option>
+                    <option value="2" <%= val === 2 ? 'selected' : '' %>>2</option>
+                    <option value="3" <%= val === 3 ? 'selected' : '' %>>3</option>
+                  </select>
+                </td>
+              <% }) %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Definições e critérios</h2>
+    <% comps.forEach(function (c) { %>
+      <details class="crit">
+        <summary><span class="code"><%= c.code %></span> <strong><%= c.name %></strong></summary>
+        <div class="form-grid">
+          <label class="field span-full"><span>Nome</span><input name="name_<%= c.code %>" value="<%= c.name %>" maxlength="200"></label>
+          <label class="field span-full"><span>Definição</span><textarea name="definition_<%= c.code %>" rows="2"><%= c.definition %></textarea></label>
+          <label class="field span-full"><span>Critério nível 1 — Não atende</span><textarea name="n1_<%= c.code %>" rows="2"><%= c.n1 %></textarea></label>
+          <label class="field span-full"><span>Critério nível 2 — Em desenvolvimento</span><textarea name="n2_<%= c.code %>" rows="2"><%= c.n2 %></textarea></label>
+          <label class="field span-full"><span>Critério nível 3 — Atende ao padrão</span><textarea name="n3_<%= c.code %>" rows="2"><%= c.n3 %></textarea></label>
+        </div>
+      </details>
+    <% }) %>
+    <details class="crit">
+      <summary><strong>+ Incluir nova competência</strong></summary>
+      <div class="form-grid">
+        <input type="hidden" name="nova_competencia" value="1">
+        <label class="field span-full"><span>Nome</span><input name="nova_nome" maxlength="200"></label>
+        <label class="field span-full"><span>Definição</span><textarea name="nova_definicao" rows="2"></textarea></label>
+        <p class="hint span-full">Depois de salvar, preencha os critérios e o nível exigido de cada cargo.</p>
+      </div>
+    </details>
+  </section>
+  <div class="form-actions"><button class="btn btn-primary" <%= locked ? 'disabled' : '' %>>Salvar rascunho</button></div>
+</form>
+
+<section class="card" id="publicar">
+  <h2>Publicar como Versão <%= nextNumber %></h2>
+  <% if (changes.length) { %>
+    <p>Alterações em relação à versão vigente:</p>
+    <ul class="plain list-lines"><% changes.forEach(function (c) { %><li><%= c %></li><% }) %></ul>
+  <% } else { %><p class="muted">Ainda não há diferenças em relação à versão vigente.</p><% } %>
+  <form method="post" action="/admin/matriz/rascunho/publicar" class="form form-grid" data-confirm="Publicar a nova versão? Ela passará a ser a vigente.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Data da versão</span><input type="date" name="version_date" value="<%= today %>" required></label>
+    <label class="field span-2"><span>O que mudou (registro de controle de versão)</span><input name="notes" required maxlength="2000"></label>
+    <div class="span-full actions">
+      <button class="btn btn-accent" <%= locked ? 'disabled' : '' %>>Publicar versão</button>
+    </div>
+  </form>
+  <form method="post" action="/admin/matriz/rascunho/descartar" data-confirm="Descartar o rascunho?" class="mt">
+    <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-ghost danger">Descartar rascunho</button>
+  </form>
+</section>
+<%- include('../partials/footer') %>

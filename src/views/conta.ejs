@@ -1,0 +1,39 @@
+<%- include('partials/header') %>
+<div class="page-head"><div><h1>Minha conta</h1></div></div>
+<% if (first) { %>
+  <div class="alert alert-warn"><strong>Primeiro acesso:</strong> crie uma senha pessoal para substituir a senha inicial.</div>
+<% } %>
+<% if (impersonating) { %>
+  <div class="alert alert-info">Você está vendo como <%= user.name %>. A troca de senha abaixo vale para a <strong>sua</strong> conta (<%= realUser.name %>).</div>
+<% } %>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Dados</h2>
+    <dl class="kv">
+      <dt>Nome</dt><dd><%= user.name %></dd>
+      <dt>E-mail</dt><dd><%= user.email %></dd>
+      <dt>Perfis</dt>
+      <dd>
+        <% var perfis = []; if (user.is_admin) perfis.push('Administradora'); if (user.is_rh) perfis.push('Execução do ciclo (RH)'); if (user.is_ceo) perfis.push('CEO — relatório geral'); if (user.is_sgi) perfis.push('Consulta do SGI'); if (vincs.length) perfis.push('Colaborador'); %>
+        <%= perfis.join(' · ') || '—' %>
+      </dd>
+      <dt>Cargo<%= vincs.length > 1 ? 's' : '' %></dt>
+      <dd><% vincs.forEach(function (v) { %><div><span class="code"><%= v.cargo_code %></span> <%= v.cargo_title %></div><% }) %><%= vincs.length ? '' : '—' %></dd>
+    </dl>
+    <p class="muted">Para corrigir nome ou e-mail, fale com o RH.</p>
+  </section>
+  <section class="card">
+    <h2>Alterar senha</h2>
+    <% if (error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/conta/senha" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="text" name="username" value="<%= realUser.email %>" autocomplete="username" hidden>
+      <label class="field"><span>Senha atual</span><input type="password" name="atual" autocomplete="current-password" required></label>
+      <label class="field"><span>Nova senha</span><input type="password" name="senha" autocomplete="new-password" required minlength="8"></label>
+      <label class="field"><span>Confirme a nova senha</span><input type="password" name="confirmacao" autocomplete="new-password" required minlength="8"></label>
+      <p class="hint">Mínimo de 8 caracteres, com letras e números.</p>
+      <button class="btn btn-primary">Salvar nova senha</button>
+    </form>
+  </section>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,313 @@
+<%- include('../partials/header') %>
+<%
+  var cov = report.coverage;
+  var bar = function (v) { if (v == null) return '<span class="muted">—</span>'; return '<span class="hbar" title="' + u.fmtPct(v) + '"><span style="width:' + Math.min(100, v) + '%"></span></span> <span class="hbar-val">' + u.fmtPct(v) + '</span>'; };
+  var dash = function (v, d) { return v == null ? '—' : u.fmtNum(v, d == null ? 1 : d); };
+%>
+<div class="page-head">
+  <div>
+    <h1>Relatórios</h1>
+    <p class="lead"><%= cycle.name %> · matriz <%= report.version ? 'Versão ' + report.version.number + ' de ' + u.fmtDate(report.version.version_date) : '—' %></p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/relatorios/exportar.pdf?<%= qs({ aba: tab }) %>">PDF desta aba</a>
+    <a class="btn" href="/relatorios/exportar.pdf?<%= qs({}) %>">PDF completo</a>
+    <a class="btn btn-primary" href="/relatorios/exportar.xlsx?<%= qs({}) %>">Excel (todas as abas)</a>
+  </div>
+</div>
+
+<form method="get" action="/relatorios" class="filters card">
+  <input type="hidden" name="aba" value="<%= tab %>">
+  <label class="field"><span>Ciclo</span>
+    <select name="ciclo"><% cycles.forEach(function (c) { %><option value="<%= c.id %>" <%= c.id === cycle.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select>
+  </label>
+  <label class="field"><span>Área</span>
+    <select name="area"><option value="">Todas</option><% options.areas.forEach(function (a) { %><option <%= filters.area === a ? 'selected' : '' %>><%= a %></option><% }) %></select>
+  </label>
+  <label class="field"><span>Gestor</span>
+    <select name="gestor"><option value="">Todos</option>
+      <% options.gestores.forEach(function (g) { %><option value="<%= g.id %>" <%= String(filters.gestor) === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %>
+      <% if (options.hasSelf) { %><option value="auto" <%= filters.gestor === 'auto' ? 'selected' : '' %>>Autoverificação</option><% } %>
+    </select>
+  </label>
+  <label class="field"><span>Cargo</span>
+    <select name="cargo"><option value="">Todos</option><% options.cargos.forEach(function (c) { %><option value="<%= c.id %>" <%= String(filters.cargo) === String(c.id) ? 'selected' : '' %>><%= c.label %></option><% }) %></select>
+  </label>
+  <div class="filters-actions">
+    <button class="btn btn-primary">Filtrar</button>
+    <a class="btn btn-ghost" href="/relatorios?aba=<%= tab %>&ciclo=<%= cycle.id %>">Limpar</a>
+  </div>
+</form>
+
+<nav class="tabs" aria-label="Seções do relatório">
+  <% Object.keys(TABS).forEach(function (k) { %>
+    <a href="/relatorios?<%= qs({ aba: k }) %>" class="<%= k === tab ? 'active' : '' %>" <%= k === tab ? 'aria-current=page' : '' %>><%= TABS[k] %></a>
+  <% }) %>
+</nav>
+
+<% if (tab === 'visao') { %>
+  <section class="card">
+    <h2>Quadro e cobertura do ciclo</h2>
+    <div class="stats">
+      <div class="stat"><div class="stat-value"><%= cov.previstas %></div><div class="stat-label">verificações previstas</div></div>
+      <div class="stat"><div class="stat-value"><%= cov.realizadas %></div><div class="stat-label">realizadas (avaliações concluídas)</div></div>
+      <div class="stat stat-accent"><div class="stat-value"><%= u.fmtPct(cov.cobertura) %></div><div class="stat-label">cobertura · meta 100%</div></div>
+      <div class="stat"><div class="stat-value"><%= cov.assinados %></div><div class="stat-label">checklists assinados (<%= u.fmtPct(cov.pctAssinados) %>)</div></div>
+    </div>
+    <div class="meter" role="img" aria-label="Cobertura <%= u.fmtPct(cov.cobertura) %>"><span style="width: <%= Math.min(100, cov.cobertura) %>%"></span></div>
+    <div class="table-wrap mt">
+      <table class="table compact">
+        <thead><tr><th>Andamento</th><th class="right">Quantidade</th><th>Proporção</th></tr></thead>
+        <tbody>
+          <tr><td>Autoavaliações enviadas</td><td class="right"><%= cov.autoEnviadas %> de <%= cov.autoEsperadas %></td><td><%- bar(cov.autoEsperadas ? Math.round(cov.autoEnviadas / cov.autoEsperadas * 1000) / 10 : null) %></td></tr>
+          <tr><td>Avaliações do gestor / autoverificações enviadas</td><td class="right"><%= cov.gestorEnviadas %> de <%= cov.previstas %></td><td><%- bar(cov.previstas ? Math.round(cov.gestorEnviadas / cov.previstas * 1000) / 10 : null) %></td></tr>
+          <tr><td>Resultados liberados ao colaborador</td><td class="right"><%= cov.liberados %> de <%= cov.autoEsperadas %></td><td><%- bar(cov.autoEsperadas ? Math.round(cov.liberados / cov.autoEsperadas * 1000) / 10 : null) %></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="status-row mt">
+      <span><%- u.statusBadge('nao_iniciada') %> <%= cov.naoIniciadas %></span>
+      <span><%- u.statusBadge('em_andamento') %> <%= cov.emAndamento %></span>
+      <span><%- u.statusBadge('concluida') %> <%= cov.concluidas %></span>
+      <span><%- u.statusBadge('assinada') %> <%= cov.assinados %></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Pendências</h2>
+    <div class="grid grid-3">
+      <div>
+        <h3>Ainda sem autoavaliação</h3>
+        <% if (!report.pendencias.autoavaliacao.length) { %><p class="empty small">Nenhuma.</p><% } else { %>
+          <ul class="plain list-lines"><% report.pendencias.autoavaliacao.forEach(function (p) { %><li><strong><%= p.colaborador %></strong> <span class="muted"><%= p.cargo %></span></li><% }) %></ul>
+        <% } %>
+      </div>
+      <div>
+        <h3>Gestor ainda não avaliou</h3>
+        <% if (!report.pendencias.gestor.length) { %><p class="empty small">Nenhuma.</p><% } else { %>
+          <ul class="plain list-lines"><% report.pendencias.gestor.forEach(function (p) { %><li><strong><%= p.userName %></strong> → <%= p.colaborador %> <span class="muted"><%= p.cargo %></span></li><% }) %></ul>
+        <% } %>
+      </div>
+      <div>
+        <h3>Ainda não assinou</h3>
+        <% if (!report.pendencias.assinatura.length) { %><p class="empty small">Nenhuma.</p><% } else { %>
+          <ul class="plain list-lines"><% report.pendencias.assinatura.forEach(function (p) { %><li><strong><%= p.userName %></strong> <span class="muted">— <%= p.text %></span></li><% }) %></ul>
+        <% } %>
+      </div>
+    </div>
+    <% if (report.pendencias.liberacao.length || report.pendencias.plano.length) { %>
+      <div class="grid grid-2 mt">
+        <div>
+          <h3>Resultado a liberar</h3>
+          <% if (!report.pendencias.liberacao.length) { %><p class="empty small">Nenhum.</p><% } else { %>
+            <ul class="plain list-lines"><% report.pendencias.liberacao.forEach(function (p) { %><li><a href="/checklists/<%= p.checklistId %>"><%= p.colaborador %></a> <span class="muted"><%= p.cargo %></span></li><% }) %></ul>
+          <% } %>
+        </div>
+        <div>
+          <h3>Plano de ação incompleto</h3>
+          <% if (!report.pendencias.plano.length) { %><p class="empty small">Nenhum.</p><% } else { %>
+            <ul class="plain list-lines"><% report.pendencias.plano.forEach(function (p) { %><li><strong><%= p.userName %></strong> <span class="muted">— <%= p.text %></span></li><% }) %></ul>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (tab === 'individual') { %>
+  <section class="card">
+    <h2>Resultado individual</h2>
+    <p class="muted">Nível verificado pelo gestor em cada competência. <span class="lvl lvl-2 gap-ring">2</span> com contorno vermelho indica lacuna; "—" indica que a competência não se aplica ao cargo. Clique no nome para ver exigido × autoavaliação × gestor.</p>
+    <div class="table-wrap">
+      <table class="table heat">
+        <thead><tr><th>Colaborador</th><th>Cargo</th><% report.comps.forEach(function (c) { %><th class="center" title="<%= c.name %>"><%= c.code %></th><% }) %><th class="center">Lacunas</th><th>Status</th></tr></thead>
+        <tbody>
+          <% report.rows.forEach(function (r) { %>
+            <tr class="<%= selected && selected.cl.id === r.cl.id ? 'row-selected' : '' %>">
+              <td><a href="/relatorios?<%= qs({ aba: 'individual', checklist: r.cl.id }) %>#detalhe"><%= r.cl.user_name %></a></td>
+              <td class="nowrap"><span class="code"><%= r.cl.cargo_code %></span></td>
+              <% report.comps.forEach(function (c) { var it = r.items.find(function (i) { return i.code === c.code; }); %>
+                <td class="center">
+                  <% if (!it) { %><span class="muted">—</span>
+                  <% } else if (it.gestor == null) { %><span class="muted small">·</span>
+                  <% } else { %><span class="lvl lvl-<%= it.gestor %> <%= it.gap ? 'gap-ring' : '' %>" title="Exigido <%= it.required %> · verificado <%= it.gestor %>"><%= it.gestor %></span><% } %>
+                </td>
+              <% }) %>
+              <td class="center"><%= r.gestorSent ? r.items.filter(function (i) { return i.gap; }).length : '—' %></td>
+              <td><%- u.statusBadge(r.cl.status) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <% if (selected) { %>
+    <section class="card" id="detalhe">
+      <div class="card-head">
+        <h2><%= selected.cl.user_name %> — <%= selected.cl.cargo_code %> <%= selected.cl.cargo_short %></h2>
+        <div class="actions"><a class="btn btn-sm" href="/checklists/<%= selected.cl.id %>">Abrir checklist</a><a class="btn btn-sm" href="/checklists/<%= selected.cl.id %>/pdf">PDF</a></div>
+      </div>
+      <p class="muted">Avaliador: <%= selected.evaluatorLabel %> · <%= selected.stage.text %></p>
+      <% if (selected.masked) { %><div class="alert alert-info">A autoavaliação fica oculta até você enviar a sua avaliação desta pessoa.</div><% } %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Competência</th><th class="center">Exigido</th><th class="center">Autoavaliação</th><th class="center"><%= selected.cl.self_verification ? 'Autoverificação' : 'Gestor' %></th><th class="center">Diferença (gestor − auto)</th><th>Lacuna</th></tr></thead>
+          <tbody>
+            <% selected.items.forEach(function (i) { %>
+              <tr>
+                <td><span class="code"><%= i.code %></span> <%= i.name %></td>
+                <td class="center"><%- u.levelChip(i.required) %></td>
+                <td class="center"><%- i.auto != null ? u.levelChip(i.auto) : '<span class="muted">—</span>' %></td>
+                <td class="center"><%- i.gestor != null ? u.levelChip(i.gestor) : '<span class="muted">—</span>' %></td>
+                <td class="center"><%= u.diffText(i.diff) %></td>
+                <td><%- u.gapBadge(i.required, i.gestor) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
+<% } %>
+
+<% if (tab === 'lacunas') { var g = report.gaps; %>
+  <section class="card">
+    <h2>Registro de lacunas e plano de ação</h2>
+    <div class="stats">
+      <div class="stat"><div class="stat-value"><%= g.total %></div><div class="stat-label">lacunas registradas</div></div>
+      <div class="stat stat-accent"><div class="stat-value"><%= g.pctComAcao == null ? '—' : u.fmtPct(g.pctComAcao) %></div><div class="stat-label">com ação, responsável e prazo (<%= g.comAcao %>)</div></div>
+      <div class="stat"><div class="stat-value"><%= g.pctConcluidas == null ? '—' : u.fmtPct(g.pctConcluidas) %></div><div class="stat-label">ações de lacuna concluídas (<%= g.concluidas %>)</div></div>
+      <div class="stat"><div class="stat-value"><%= g.livres.length %></div><div class="stat-label">ações livres de desenvolvimento</div></div>
+    </div>
+    <div class="table-wrap mt">
+      <table class="table">
+        <thead><tr><th>Colaborador</th><th>Cargo</th><th>Competência</th><th class="center">Exigido → verificado</th><th>Ação acordada</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead>
+        <tbody>
+          <% if (!g.lacunas.length) { %><tr><td colspan="8" class="empty">Nenhuma lacuna registrada até agora.</td></tr><% } %>
+          <% g.lacunas.forEach(function (l) { %>
+            <tr class="<%= l.defined ? '' : 'row-missing' %>">
+              <td><a href="/checklists/<%= l.checklistId %>#plano"><%= l.colaborador %></a></td>
+              <td class="nowrap"><span class="code"><%= l.cargoCode %></span> <%= l.cargo %></td>
+              <td><span class="code"><%= l.competency_code %></span> <%= l.competencia %></td>
+              <td class="center nowrap"><%= l.required_level %> → <%= l.verified_level %></td>
+              <td><%= l.action || 'Sem ação definida' %></td>
+              <td><%= l.responsible || '—' %></td>
+              <td class="nowrap"><%= u.fmtDate(l.due_date) %></td>
+              <td><%- u.actionBadge(l.status) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (g.livres.length) { %>
+      <h3 class="mt">Ações livres de desenvolvimento</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Colaborador</th><th>Tipo</th><th>Ação</th><th>Responsável</th><th>Prazo</th><th>Validada</th><th>Status</th></tr></thead>
+          <tbody>
+            <% g.livres.forEach(function (l) { %>
+              <tr>
+                <td><a href="/checklists/<%= l.checklistId %>#plano"><%= l.colaborador %></a></td>
+                <td><%= u.ACTION_CATEGORIES[l.category] || '—' %></td>
+                <td><%= l.action %></td>
+                <td><%= l.responsible || '—' %></td>
+                <td class="nowrap"><%= u.fmtDate(l.due_date) %></td>
+                <td><%= l.validated_by ? 'Sim' : 'Aguardando gestor' %></td>
+                <td><%- u.actionBadge(l.status) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (tab === 'competencia') { %>
+  <section class="card">
+    <h2>Visão por competência</h2>
+    <p class="muted">Considera as avaliações do gestor (e autoverificações) já enviadas. Diferença média = nota do gestor − autoavaliação; negativa indica autoavaliação acima da avaliação do gestor.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Competência</th><th class="right">Avaliadas</th><th class="right">Atende</th><th class="right">Lacunas</th><th>% que atende</th><th class="right">Média exigida</th><th class="right">Média verificada</th><th class="right">Média auto</th><th class="right">Dif. média</th></tr></thead>
+        <tbody>
+          <% report.byCompetency.forEach(function (c) { %>
+            <tr>
+              <td><span class="code"><%= c.code %></span> <%= c.name %></td>
+              <td class="right"><%= c.avaliadas %>/<%= c.aplicavel %></td>
+              <td class="right"><%= c.atende %></td>
+              <td class="right"><%= c.lacunas %></td>
+              <td class="nowrap"><%- bar(c.pctAtende) %></td>
+              <td class="right"><%= dash(c.mediaExigida) %></td>
+              <td class="right"><%= dash(c.mediaVerificada) %></td>
+              <td class="right"><%= dash(c.mediaAuto) %></td>
+              <td class="right"><%= c.difMedia == null ? '—' : (c.difMedia > 0 ? '+' : '') + u.fmtNum(c.difMedia, 2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<% ['cargo', 'gestor', 'area'].forEach(function (k) { if (tab !== k) return;
+     var data = k === 'cargo' ? report.byCargo : (k === 'gestor' ? report.byGestor : report.byArea);
+     var head = k === 'cargo' ? 'Cargo' : (k === 'gestor' ? 'Gestor / equipe' : 'Área'); %>
+  <section class="card">
+    <h2>Visão <%= k === 'gestor' ? 'por gestor / equipe' : 'por ' + head.toLowerCase() %></h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th><%= head %></th><th class="right">Previstas</th><th class="right">Realizadas</th><th>Cobertura</th><th class="right">Assinados</th><th class="right">Competências avaliadas</th><th>% que atende</th><th class="right">Lacunas</th></tr></thead>
+        <tbody>
+          <% data.forEach(function (d) { %>
+            <tr>
+              <td><strong><%= d.label %></strong></td>
+              <td class="right"><%= d.previstas %></td>
+              <td class="right"><%= d.realizadas %></td>
+              <td class="nowrap"><%- bar(d.cobertura) %></td>
+              <td class="right"><%= d.assinados %></td>
+              <td class="right"><%= d.avaliadas %></td>
+              <td class="nowrap"><%- bar(d.pctAtende) %></td>
+              <td class="right"><%= d.lacunas %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% }) %>
+
+<% if (tab === 'comparacao') { %>
+  <section class="card">
+    <h2>Comparação com o ciclo anterior</h2>
+    <% if (!report.comparison) { %>
+      <p class="empty">O <%= cycle.name %> é o primeiro ciclo da empresa, então ainda não há base de comparação. A partir do próximo ciclo, esta seção mostra a evolução da cobertura, do atendimento por competência e das lacunas.</p>
+    <% } else { var p = report.comparison.previous, c = report.comparison.current;
+         var delta = function (a, b) { if (a == null || b == null) return '—'; var d = Math.round((b - a) * 10) / 10; return (d > 0 ? '+' : '') + String(d).replace('.', ','); }; %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Indicador</th><th class="right"><%= p.cycle.name %></th><th class="right"><%= c.cycle.name %></th><th class="right">Variação</th></tr></thead>
+          <tbody>
+            <tr><td>Verificações previstas</td><td class="right"><%= p.coverage.previstas %></td><td class="right"><%= c.coverage.previstas %></td><td class="right"><%= delta(p.coverage.previstas, c.coverage.previstas) %></td></tr>
+            <tr><td>Cobertura (%)</td><td class="right"><%= u.fmtPct(p.coverage.cobertura) %></td><td class="right"><%= u.fmtPct(c.coverage.cobertura) %></td><td class="right"><%= delta(p.coverage.cobertura, c.coverage.cobertura) %> p.p.</td></tr>
+            <tr><td>Checklists assinados</td><td class="right"><%= p.coverage.assinados %></td><td class="right"><%= c.coverage.assinados %></td><td class="right"><%= delta(p.coverage.assinados, c.coverage.assinados) %></td></tr>
+            <tr><td>Competências que atendem (%)</td><td class="right"><%= p.pctAtende == null ? '—' : u.fmtPct(p.pctAtende) %></td><td class="right"><%= c.pctAtende == null ? '—' : u.fmtPct(c.pctAtende) %></td><td class="right"><%= delta(p.pctAtende, c.pctAtende) %> p.p.</td></tr>
+            <tr><td>Lacunas</td><td class="right"><%= p.lacunas %></td><td class="right"><%= c.lacunas %></td><td class="right"><%= delta(p.lacunas, c.lacunas) %></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="mt">% que atende por competência</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Competência</th><th><%= p.cycle.name %></th><th><%= c.cycle.name %></th><th class="right">Variação</th></tr></thead>
+          <tbody>
+            <% c.competencias.forEach(function (cc) { var pc = p.competencias.find(function (x) { return x.code === cc.code; }); %>
+              <tr><td><span class="code"><%= cc.code %></span> <%= cc.name %></td><td class="nowrap"><%- bar(pc ? pc.pctAtende : null) %></td><td class="nowrap"><%- bar(cc.pctAtende) %></td><td class="right"><%= delta(pc ? pc.pctAtende : null, cc.pctAtende) %> p.p.</td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+<%- include('../partials/footer') %>

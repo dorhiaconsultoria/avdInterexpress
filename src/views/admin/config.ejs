@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/admin">Administração</a> › Configurações</p>
+<div class="page-head"><div><h1>Configurações</h1></div></div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Logo da InterExpress</h2>
+    <p class="muted">Envie o logo oficial (PNG, JPG, SVG ou WEBP). Ele aparece no topo das páginas e nos PDFs (PNG, JPG ou SVG). As cores do sistema seguem o azul royal e o laranja da marca.</p>
+    <div class="logo-preview"><img src="<%= logoUrl %>" alt="Logo atual"></div>
+    <form method="post" action="/admin/configuracoes/logo" enctype="multipart/form-data" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="file" name="logo" accept=".png,.jpg,.jpeg,.svg,.webp" required>
+      <button class="btn btn-primary">Enviar logo</button>
+    </form>
+    <% if (hasLogo) { %>
+      <form method="post" action="/admin/configuracoes/logo" enctype="multipart/form-data" class="mt">
+        <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="remover" value="1">
+        <button class="btn btn-ghost danger">Voltar ao logo padrão</button>
+      </form>
+    <% } %>
+  </section>
+  <section class="card">
+    <h2>Servidor e e-mail</h2>
+    <dl class="kv">
+      <dt>Endereço do sistema (links dos e-mails)</dt><dd><%= appUrl %></dd>
+      <dt>Servidor de e-mail (SMTP)</dt><dd><%= smtp ? smtpHost : 'Não configurado' %></dd>
+      <dt>Remetente</dt><dd><%= smtpFrom %></dd>
+      <dt>Modo</dt><dd><%= testMode ? 'Modo de teste (nenhum e-mail é enviado)' : 'No ar desde ' + u.fmtDateTime(wentLiveAt) %></dd>
+    </dl>
+    <p class="muted small">Esses valores vêm das variáveis de ambiente do servidor (APP_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM). Veja o README.</p>
+  </section>
+</div>
+<%- include('../partials/footer') %>

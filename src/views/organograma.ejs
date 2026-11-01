@@ -1,0 +1,17 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Organograma</h1>
+    <p class="lead"><%= total %> verificações (colaborador + cargo) para <%= people %> pessoas</p>
+  </div>
+  <% if (user.is_admin) { %><a class="btn" href="/admin/pessoas">Editar hierarquia</a><% } %>
+</div>
+<p class="muted">Cada caixa é um cargo ocupado por uma pessoa. O avaliador de cada verificação é o ocupante do cargo imediatamente acima. O Dhiego ocupa dois cargos (CEO e Diretor Comercial e Operações), por isso aparece duas vezes e tem dois checklists, ambos por autoverificação validada por terceiro.</p>
+<div class="card org-wrap">
+  <ul class="org">
+    <% tree.forEach(function (node) { %>
+      <%- include('partials/org-node', { node: node }) %>
+    <% }) %>
+  </ul>
+</div>
+<%- include('partials/footer') %>

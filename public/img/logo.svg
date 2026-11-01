@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 236 56" width="236" height="56" role="img" aria-label="InterExpress">
+  <circle cx="27" cy="28" r="21" fill="#1A3E9E"/>
+  <path d="M10 34 C18 22 30 17 43 19" fill="none" stroke="#F28C1B" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M38 12.5 L45.5 19.5 L37 25" fill="none" stroke="#F28C1B" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 40 C21 33 31 31 41 32" fill="none" stroke="#FFFFFF" stroke-opacity=".55" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="56" y="36.5" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" letter-spacing="-0.3" fill="#1A3E9E">Inter<tspan fill="#F28C1B">Express</tspan></text>
+</svg>

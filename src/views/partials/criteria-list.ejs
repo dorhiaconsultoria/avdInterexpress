@@ -1,0 +1,14 @@
+<% /* Definições e critérios. Espera: comps */ %>
+<div class="criteria">
+  <% comps.forEach(function (c) { %>
+    <details class="crit">
+      <summary><span class="code"><%= c.code %></span> <strong><%= c.name %></strong><% if (c.leadership_only) { %> <span class="tag">lideranças</span><% } %></summary>
+      <p><%= c.definition %></p>
+      <dl class="kv kv-tight">
+        <dt>Nível 1 — Não atende</dt><dd><%= c.n1 %></dd>
+        <dt>Nível 2 — Em desenvolvimento</dt><dd><%= c.n2 %></dd>
+        <dt>Nível 3 — Atende ao padrão</dt><dd><%= c.n3 %></dd>
+      </dl>
+    </details>
+  <% }) %>
+</div>

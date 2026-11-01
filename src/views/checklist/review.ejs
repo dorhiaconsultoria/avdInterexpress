@@ -1,0 +1,49 @@
+<%- include('../partials/header') %>
+<p class="crumbs"><a href="/">Início</a> › <a href="/checklists/<%= cl.id %>">Checklist de <%= cl.user_name %></a> › <a href="/checklists/<%= cl.id %>/avaliar/<%= kind %>"><%= evTitle %></a> › Revisão</p>
+<%- include('../partials/cl-header', { compact: true }) %>
+
+<section class="card">
+  <h2>Revise antes de enviar</h2>
+  <% if (missing.length) { %>
+    <div class="alert alert-error" role="alert">
+      Faltam nota e/ou evidência em <strong><%= missing.length %></strong> competência(s):
+      <% missing.forEach(function (c, i) { %><a href="/checklists/<%= cl.id %>/avaliar/<%= kind %>#<%= c.code %>"><%= c.code %> <%= c.name %></a><%= i < missing.length - 1 ? ', ' : '.' %><% }) %>
+      Toda nota exige uma evidência.
+    </div>
+  <% } else { %>
+    <p>Confira as notas e as evidências. Depois de enviada, a avaliação só pode ser reaberta pela administradora.</p>
+  <% } %>
+  <div class="table-wrap">
+    <table class="table review-table">
+      <thead>
+        <tr><th>Competência</th><% if (showRequired) { %><th class="center">Exigido</th><% } %><th class="center">Nota</th><% if (showRequired) { %><th>Situação</th><% } %><th>Evidência</th></tr>
+      </thead>
+      <tbody>
+        <% comps.applicable.forEach(function (c) { var it = evaluation.items[c.code] || {}; var bad = !it.rating || !it.evidence || !String(it.evidence).trim();
+             var atts = attachments.filter(function (a) { return a.competency_code === c.code; }); %>
+          <tr class="<%= bad ? 'row-missing' : '' %>">
+            <td><span class="code"><%= c.code %></span> <strong><%= c.name %></strong></td>
+            <% if (showRequired) { %><td class="center"><%- u.levelChip(c.required) %></td><% } %>
+            <td class="center nowrap"><%- it.rating ? u.levelChip(it.rating) + ' <span class="lvl-label">' + u.escapeHtml(u.LEVEL_LABELS[it.rating]) + '</span>' : '<span class="badge badge-danger">sem nota</span>' %></td>
+            <% if (showRequired) { %><td><%- u.gapBadge(c.required, it.rating) %></td><% } %>
+            <td>
+              <% if (it.evidence && String(it.evidence).trim()) { %><%= it.evidence %><% } else { %><span class="badge badge-danger">sem evidência</span><% } %>
+              <% if (atts.length) { %><div class="muted small">Anexos: <% atts.forEach(function (a, i) { %><a href="/anexos/<%= a.id %>"><%= a.original_name %></a><%= i < atts.length - 1 ? ', ' : '' %><% }) %></div><% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="form-actions">
+  <a class="btn" href="/checklists/<%= cl.id %>/avaliar/<%= kind %>">← Voltar e editar</a>
+  <% if (!missing.length) { %>
+    <form method="post" action="/checklists/<%= cl.id %>/avaliar/<%= kind %>/enviar" class="inline-form" data-confirm="Confirma o envio? Depois de enviada, só a administradora pode reabrir.">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn btn-primary">Confirmar e enviar <%= evTitle.toLowerCase() %></button>
+    </form>
+  <% } %>
+</div>
+<%- include('../partials/footer') %>
