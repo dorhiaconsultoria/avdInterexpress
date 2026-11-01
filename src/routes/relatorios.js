@@ -5,7 +5,7 @@ const audit = require('../lib/audit');
 const domain = require('../lib/domain');
 const reports = require('../lib/reports');
 
-const router = express.Router();
+const router = require('../lib/async-router')();
 
 const TABS = {
   visao: 'Cobertura e pendências',
@@ -18,9 +18,9 @@ const TABS = {
   comparacao: 'Comparação com o ciclo anterior',
 };
 
-function readFilters(req) {
-  const cycles = domain.listCycles();
-  const cur = domain.currentCycle();
+async function readFilters(req) {
+  const cycles = await domain.listCycles();
+  const cur = await domain.currentCycle();
   const cycle = cycles.find((c) => String(c.id) === String(req.query.ciclo)) || cur;
   const filters = {
     area: req.query.area || '',
@@ -36,27 +36,27 @@ function qs(cycle, filters, extra = {}) {
   return p.toString();
 }
 
-router.get('/relatorios', auth.requireRole('admin', 'ceo'), (req, res) => {
-  const { cycles, cycle, filters } = readFilters(req);
+router.get('/relatorios', auth.requireRole('admin', 'ceo'), async (req, res) => {
+  const { cycles, cycle, filters } = await readFilters(req);
   if (!cycle) return res.render('error', { title: 'Relatórios', message: 'Nenhum ciclo cadastrado.' });
   const tab = TABS[req.query.aba] ? req.query.aba : 'visao';
-  const report = reports.buildReport(cycle, filters, req.user);
-  audit.log(req, 'visualizou_relatorio', { details: { aba: tab, ciclo: cycle.name, ...filters }, coalesceMinutes: 10 });
+  const report = await reports.buildReport(cycle, filters, req.user);
+  await audit.log(req, 'visualizou_relatorio', { details: { aba: tab, ciclo: cycle.name, ...filters }, coalesceMinutes: 10 });
   const selected = req.query.checklist ? report.rows.find((r) => String(r.cl.id) === String(req.query.checklist)) : null;
   res.render('relatorios/index', {
     title: 'Relatórios',
     cycles, cycle, filters, tab, TABS, report, selected,
-    options: reports.filterOptions(cycle),
+    options: await reports.filterOptions(cycle),
     qs: (extra) => qs(cycle, filters, extra),
   });
 });
 
 router.get('/relatorios/exportar.:fmt(pdf|xlsx)', auth.requireRole('admin', 'ceo'), async (req, res, next) => {
   try {
-    const { cycle, filters } = readFilters(req);
-    const report = reports.buildReport(cycle, filters, req.user);
+    const { cycle, filters } = await readFilters(req);
+    const report = await reports.buildReport(cycle, filters, req.user);
     const section = TABS[req.query.aba] ? req.query.aba : 'todas';
-    audit.log(req, 'exportou_relatorio', { details: { formato: req.params.fmt, aba: section, ciclo: cycle.name, ...filters } });
+    await audit.log(req, 'exportou_relatorio', { details: { formato: req.params.fmt, aba: section, ciclo: cycle.name, ...filters } });
     const base = `relatorio-competencias-${cycle.year}${section !== 'todas' ? `-${section}` : ''}`;
     if (req.params.fmt === 'xlsx') {
       const buf = await require('../lib/excel').reportWorkbook(report, section);
@@ -73,9 +73,9 @@ router.get('/relatorios/exportar.:fmt(pdf|xlsx)', auth.requireRole('admin', 'ceo
 
 /* ------------------------------------------------- Indicadores do SGI */
 
-function sgiData(cycle) {
-  const rows = reports.detailRows(domain.listChecklists(cycle.id), cycle, null);
-  const full = reports.buildReport(cycle, {}, null);
+async function sgiData(cycle) {
+  const rows = await reports.detailRows(await domain.listChecklists(cycle.id), cycle, null);
+  const full = await reports.buildReport(cycle, {}, null);
   return {
     rows: rows.map((r) => ({
       code: r.cl.cargo_code,
@@ -97,20 +97,20 @@ function sgiData(cycle) {
   };
 }
 
-router.get('/sgi', auth.requireRole('admin', 'ceo', 'rh', 'sgi'), (req, res) => {
-  const cycles = domain.listCycles();
-  const cycle = cycles.find((c) => String(c.id) === String(req.query.ciclo)) || domain.currentCycle();
+router.get('/sgi', auth.requireRole('admin', 'ceo', 'rh', 'sgi'), async (req, res) => {
+  const cycles = await domain.listCycles();
+  const cycle = cycles.find((c) => String(c.id) === String(req.query.ciclo)) || await domain.currentCycle();
   if (!cycle) return res.render('error', { title: 'Indicadores SGI', message: 'Nenhum ciclo cadastrado.' });
-  audit.log(req, 'visualizou_indicadores_sgi', { details: { ciclo: cycle.name }, coalesceMinutes: 10 });
-  res.render('relatorios/sgi', { title: 'Indicadores SGI', cycle, cycles, ...sgiData(cycle) });
+  await audit.log(req, 'visualizou_indicadores_sgi', { details: { ciclo: cycle.name }, coalesceMinutes: 10 });
+  res.render('relatorios/sgi', { title: 'Indicadores SGI', cycle, cycles, ...await sgiData(cycle) });
 });
 
 router.get('/sgi/exportar.pdf', auth.requireRole('admin', 'ceo', 'rh', 'sgi'), async (req, res, next) => {
   try {
-    const cycles = domain.listCycles();
-    const cycle = cycles.find((c) => String(c.id) === String(req.query.ciclo)) || domain.currentCycle();
-    const buf = await require('../lib/pdf').sgiPdf(cycle, sgiData(cycle));
-    audit.log(req, 'exportou_relatorio', { details: { formato: 'pdf', aba: 'sgi', ciclo: cycle.name } });
+    const cycles = await domain.listCycles();
+    const cycle = cycles.find((c) => String(c.id) === String(req.query.ciclo)) || await domain.currentCycle();
+    const buf = await require('../lib/pdf').sgiPdf(cycle, await sgiData(cycle));
+    await audit.log(req, 'exportou_relatorio', { details: { formato: 'pdf', aba: 'sgi', ciclo: cycle.name } });
     res.set('Content-Type', 'application/pdf');
     res.set('Content-Disposition', `attachment; filename="sgi-e3-3-1-item7-${cycle.year}.pdf"`);
     return res.send(buf);

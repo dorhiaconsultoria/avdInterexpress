@@ -7,6 +7,11 @@ const path = require('path');
 function setupEnv() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ie-test-'));
   process.env.DATA_DIR = dir;
+  delete process.env.DATABASE_URL;
+  delete process.env.POSTGRES_URL;
+  delete process.env.VERCEL;
+  // Para testar com um Postgres de verdade (driver pg): TEST_DATABASE_URL=postgres://...
+  if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   process.env.DISABLE_SCHEDULER = '1';
   process.env.APP_URL = 'http://localhost';
   return dir;
