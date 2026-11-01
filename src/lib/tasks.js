@@ -7,12 +7,11 @@ const domain = require('./domain');
  * Lista todas as pendências do ciclo.
  * Cada pendência: { userId, userName, checklistId, type, text, deadline, href, colaborador, cargo }
  */
-function cyclePendencias(cycle) {
+async function cyclePendencias(cycle) {
   if (!cycle) return [];
-  const db = dbm.get();
-  const list = domain.listChecklists(cycle.id);
-  const evalRows = db.prepare(`SELECT e.checklist_id, e.kind, e.status FROM evaluations e
-                                 JOIN checklists cl ON cl.id = e.checklist_id WHERE cl.cycle_id = ?`).all(cycle.id);
+  const list = await domain.listChecklists(cycle.id);
+  const evalRows = await dbm.all(`SELECT e.checklist_id, e.kind, e.status FROM evaluations e
+                                 JOIN checklists cl ON cl.id = e.checklist_id WHERE cl.cycle_id = ?`, cycle.id);
   const evalMap = {};
   for (const r of evalRows) (evalMap[r.checklist_id] = evalMap[r.checklist_id] || {})[r.kind] = r.status;
   const out = [];
@@ -24,8 +23,8 @@ function cyclePendencias(cycle) {
 
   for (const cl of list) {
     const ev = evalMap[cl.id] || {};
-    const sigs = domain.signaturesOf(cl.id);
-    const plan = domain.planSummary(cl.id);
+    const sigs = await domain.signaturesOf(cl.id);
+    const plan = await domain.planSummary(cl.id);
     if (cl.status === 'assinada') continue;
     if (cl.self_verification) {
       if (ev.gestor !== 'enviada') {
@@ -35,7 +34,7 @@ function cyclePendencias(cycle) {
       }
       if (!plan.complete) push(cl, cl.user_id, cl.user_name, 'plano', `Completar o plano de ação do cargo ${cl.cargo_code}`, cycle.feedback_deadline);
       else if (!sigs.colaborador) push(cl, cl.user_id, cl.user_name, 'assinatura', `Assinar o checklist do cargo ${cl.cargo_code}`, cycle.feedback_deadline);
-      if (!sigs.validador && !domain.hasAta(cl.id)) {
+      if (!sigs.validador && !await domain.hasAta(cl.id)) {
         if (cl.validator_user_id) {
           push(cl, cl.validator_user_id, cl.validator_name, 'validacao', `Validar a autoverificação de ${cl.user_name} (${cl.cargo_code} — ${cl.cargo_short})`, cycle.feedback_deadline);
         } else {
@@ -71,9 +70,9 @@ function cyclePendencias(cycle) {
   return out;
 }
 
-function tasksForUser(userId, cycle) {
+async function tasksForUser(userId, cycle) {
   if (!cycle || cycle.status !== 'em_andamento') return [];
-  return cyclePendencias(cycle).filter((p) => p.userId === userId);
+  return (await cyclePendencias(cycle)).filter((p) => p.userId === userId);
 }
 
 /** Agrupa pendências por pessoa (para lembretes). */

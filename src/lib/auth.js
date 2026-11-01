@@ -6,7 +6,6 @@ const config = require('../config');
 const { randomToken, sha256, nowIso } = require('./util');
 
 const COOKIE = 'ie_sid';
-const db = () => dbm.get();
 
 function hashPassword(pw) {
   return bcrypt.hashSync(pw, 10);
@@ -40,68 +39,76 @@ function cookieOptions(maxAgeMs) {
   return { httpOnly: true, sameSite: 'lax', secure: config.secureCookies, path: '/', maxAge: maxAgeMs };
 }
 
-function createSession(res, userId) {
+async function createSession(res, userId) {
   const token = randomToken(32);
   const now = new Date();
   const expires = new Date(now.getTime() + config.sessionHours * 3600 * 1000);
-  db().prepare('INSERT INTO sessions (id, user_id, csrf, created_at, expires_at) VALUES (?,?,?,?,?)')
-    .run(sha256(token), userId, randomToken(24), now.toISOString(), expires.toISOString());
+  await dbm.run('INSERT INTO sessions (id, user_id, csrf, created_at, expires_at) VALUES (?,?,?,?,?)', sha256(token), userId, randomToken(24), now.toISOString(), expires.toISOString());
   res.cookie(COOKIE, token, cookieOptions(config.sessionHours * 3600 * 1000));
 }
 
-function destroySession(req, res) {
-  if (req.sessionRow) db().prepare('DELETE FROM sessions WHERE id = ?').run(req.sessionRow.id);
+async function destroySession(req, res) {
+  if (req.sessionRow) await dbm.run('DELETE FROM sessions WHERE id = ?', req.sessionRow.id);
   res.clearCookie(COOKIE, { path: '/' });
 }
 
-function destroyUserSessions(userId, exceptSessionId = null) {
-  db().prepare('DELETE FROM sessions WHERE user_id = ? AND id IS NOT ?').run(userId, exceptSessionId);
+async function destroyUserSessions(userId, exceptSessionId = null) {
+  await dbm.run('DELETE FROM sessions WHERE user_id = ? AND id IS DISTINCT FROM ?', userId, exceptSessionId);
 }
 
 /** Carrega a sessão, o usuário real e o usuário efetivo ("entrar como", só no modo de teste). */
-function loadSession(req, res, next) {
+async function loadSession(req, res, next) {
+  try {
+    await loadSessionInner(req);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function loadSessionInner(req) {
   const token = parseCookies(req.headers.cookie)[COOKIE];
   req.sessionRow = null;
   req.realUser = null;
   req.user = null;
   if (token) {
-    const row = db().prepare('SELECT * FROM sessions WHERE id = ?').get(sha256(token));
+    const row = await dbm.get('SELECT * FROM sessions WHERE id = ?', sha256(token));
     if (row && row.expires_at > nowIso()) {
-      const real = db().prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(row.user_id);
+      const real = await dbm.get('SELECT * FROM users WHERE id = ? AND active = 1', row.user_id);
       if (real) {
         req.sessionRow = row;
         req.realUser = real;
         req.user = real;
-        if (row.acting_as_user_id && real.is_admin && dbm.isTestMode()) {
-          const acting = db().prepare('SELECT * FROM users WHERE id = ?').get(row.acting_as_user_id);
+        if (row.acting_as_user_id && real.is_admin && await dbm.isTestMode()) {
+          const acting = await dbm.get('SELECT * FROM users WHERE id = ?', row.acting_as_user_id);
           if (acting) req.user = acting;
         } else if (row.acting_as_user_id) {
-          db().prepare('UPDATE sessions SET acting_as_user_id = NULL WHERE id = ?').run(row.id);
+          await dbm.run('UPDATE sessions SET acting_as_user_id = NULL WHERE id = ?', row.id);
         }
         // Renovação deslizante da sessão
         const newExp = new Date(Date.now() + config.sessionHours * 3600 * 1000).toISOString();
-        db().prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').run(newExp, row.id);
+        await dbm.run('UPDATE sessions SET expires_at = ? WHERE id = ?', newExp, row.id);
       }
     } else if (row) {
-      db().prepare('DELETE FROM sessions WHERE id = ?').run(row.id);
+      await dbm.run('DELETE FROM sessions WHERE id = ?', row.id);
     }
   }
   req.impersonating = !!(req.user && req.realUser && req.user.id !== req.realUser.id);
-  next();
 }
 
-function flash(req, type, message) {
+async function flash(req, type, message) {
   if (!req.sessionRow) return;
   const list = req.sessionRow.flash ? JSON.parse(req.sessionRow.flash) : [];
   list.push({ type, message });
   req.sessionRow.flash = JSON.stringify(list);
-  db().prepare('UPDATE sessions SET flash = ? WHERE id = ?').run(req.sessionRow.flash, req.sessionRow.id);
+  await dbm.run('UPDATE sessions SET flash = ? WHERE id = ?', req.sessionRow.flash, req.sessionRow.id);
 }
 
 function takeFlash(req) {
   if (!req.sessionRow || !req.sessionRow.flash) return [];
   const list = JSON.parse(req.sessionRow.flash);
-  db().prepare('UPDATE sessions SET flash = NULL WHERE id = ?').run(req.sessionRow.id);
+  // Limpa no banco sem atrasar a página
+  dbm.run('UPDATE sessions SET flash = NULL WHERE id = ?', req.sessionRow.id).catch(() => {});
   req.sessionRow.flash = null;
   return list;
 }

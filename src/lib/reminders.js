@@ -11,14 +11,14 @@ function earliest(items) {
 }
 
 async function sendReminder(userId, items, titulo = 'pendências na Verificação de Competências') {
-  const user = domain.getUser(userId);
+  const user = await domain.getUser(userId);
   if (!user || !user.active || !items.length) return null;
-  return mailer.queue(mailer.templates.lembrete(user, { titulo, itens: items.map((i) => i.text), prazo: earliest(items) }));
+  return await mailer.queue(mailer.templates.lembrete(user, { titulo, itens: items.map((i) => i.text), prazo: earliest(items) }));
 }
 
 /** Envia lembrete a todos com pendência (ou só aos ids informados). */
 async function sendManualReminders(cycle, userIds = null) {
-  const groups = tasks.groupByUser(tasks.cyclePendencias(cycle))
+  const groups = tasks.groupByUser(await tasks.cyclePendencias(cycle))
     .filter((g) => !userIds || userIds.includes(g.userId));
   const results = [];
   for (const g of groups) {
@@ -30,13 +30,12 @@ async function sendManualReminders(cycle, userIds = null) {
 
 /** Lembretes automáticos: só funcionam com o sistema no ar (fora do modo de teste). */
 async function runAutomatic(now = new Date()) {
-  if (dbm.isTestMode()) return [];
-  const cycle = domain.currentCycle();
+  if (await dbm.isTestMode()) return [];
+  const cycle = await domain.currentCycle();
   if (!cycle || cycle.status !== 'em_andamento') return [];
-  const db = dbm.get();
   const today = todayLocal(now);
   const perUser = new Map();
-  for (const p of tasks.cyclePendencias(cycle)) {
+  for (const p of await tasks.cyclePendencias(cycle)) {
     if (!p.userId || !p.deadline) continue;
     const left = daysBetween(today, p.deadline);
     let key = null;
@@ -48,7 +47,7 @@ async function runAutomatic(now = new Date()) {
       key = `pendencia:${p.type}:${p.checklistId}:${p.userId}:${Math.floor(-left / 7)}`;
       kind = 'pendencia';
     }
-    if (!key || db.prepare('SELECT 1 FROM reminders_sent WHERE key = ?').get(key)) continue;
+    if (!key || await dbm.get('SELECT 1 FROM reminders_sent WHERE key = ?', key)) continue;
     if (!perUser.has(p.userId)) perUser.set(p.userId, { items: [], keys: [], kinds: new Set() });
     const g = perUser.get(p.userId);
     g.items.push(p);
@@ -60,7 +59,7 @@ async function runAutomatic(now = new Date()) {
     const titulo = g.kinds.has('pendencia') ? 'há pendências com prazo vencido' : 'prazo próximo na Verificação de Competências';
     const r = await sendReminder(userId, g.items, titulo);
     if (!r) continue;
-    for (const k of g.keys) db.prepare('INSERT OR IGNORE INTO reminders_sent (key, sent_at) VALUES (?, ?)').run(k, nowIso());
+    for (const k of g.keys) await dbm.run('INSERT INTO reminders_sent (key, sent_at) VALUES (?, ?) ON CONFLICT (key) DO NOTHING', k, nowIso());
     sent.push({ userId, status: r.status });
   }
   return sent;

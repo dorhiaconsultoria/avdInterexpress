@@ -4,16 +4,37 @@ Sistema web de verificação de competências (avaliação de desempenho) da Int
 
 Também é a evidência do **item 7 do Registro SGI (E3.3.1)**: mostra que a empresa **define** a competência exigida de cada função (matriz por cargo), **verifica** essa competência (checklist com evidências e assinaturas) e **desenvolve** o que falta (plano de ação para cada lacuna).
 
-## Como rodar
+## Publicar no Vercel (recomendado)
 
-Requisitos: Node.js 22.13 ou mais recente (a versão LTS do site nodejs.org serve). O banco é o SQLite que já vem no próprio Node, então o `npm install` não precisa compilar nada (não exige Python nem Visual Studio).
+O sistema roda no Vercel com um banco **Postgres do Neon**, criado pelo próprio painel do Vercel. Não é preciso instalar nada no computador.
+
+1. No Vercel, clique em **Add New… › Project** e importe o repositório `dorhiaconsultoria/avdInterexpress`.
+2. Antes de clicar em **Deploy**, abra **Environment Variables** e cadastre `ADMIN_SENHA_INICIAL` com uma senha só sua. Essa é a senha do primeiro acesso da administradora; sem ela, vale `Teste@2026`.
+3. Clique em **Deploy**. O primeiro deploy vai mostrar a página "Configuração pendente", porque ainda não há banco.
+4. No projeto, abra **Storage › Create Database › Neon (Postgres)**. Escolha a região **São Paulo** se ela aparecer, aceite o plano gratuito e conecte ao projeto. O Vercel cria a variável `DATABASE_URL` sozinho.
+5. Em **Deployments**, abra o último deploy e clique em **Redeploy**.
+6. Abra o endereço do projeto (ex.: `https://avd-interexpress.vercel.app`). No primeiro acesso o sistema cria as tabelas e carrega os dados iniciais.
+
+A cada push no GitHub, o Vercel publica uma versão nova automaticamente. A região das funções é São Paulo (`gru1`, em `vercel.json`).
+
+Também configurado no `vercel.json`:
+- **Lembretes automáticos**: rodam todo dia às 8h (horário de Brasília) pelo Cron Jobs do Vercel, e só enviam e-mail depois de "Colocar no ar". Opcional: cadastre `CRON_SECRET` nas variáveis do projeto.
+- **Anexos**: ficam guardados no próprio banco, com limite de **4 MB por arquivo** (limite do Vercel).
+
+## Rodar no computador (opcional)
+
+Requisitos: Node.js 20 ou mais recente.
 
 ```bash
 npm install
 npm start            # http://localhost:3000
 ```
 
-No primeiro start o sistema cria o banco (`data/interexpress.db`) já carregado com:
+Sem `DATABASE_URL`, o sistema usa um Postgres embutido (PGlite) gravado em `data/pgdata`. Não é preciso instalar banco de dados.
+
+## Dados iniciais
+
+Na primeira execução, o banco é criado já carregado com:
 
 - 15 pessoas, 16 cargos (F01–F16), a hierarquia e o organograma;
 - a matriz de competências **Versão 1 de 14/10/2026** (10 competências, critérios dos níveis e nível exigido por cargo);
@@ -28,7 +49,7 @@ No primeiro start o sistema cria o banco (`data/interexpress.db`) já carregado 
 
 No primeiro acesso, o sistema pede uma senha nova. As outras pessoas não têm senha no modo de teste: a administradora testa as telas delas com **Entrar como**.
 
-Para apagar tudo e recomeçar do zero (cadastros e exemplos originais): `npm run reset`.
+No computador, para apagar tudo e recomeçar do zero (cadastros e exemplos originais): `npm run reset`. No Vercel, use "Apagar avaliações de teste" ou "Recarregar exemplos" na tela de administração.
 
 ## Modo de teste
 
@@ -77,7 +98,7 @@ O **checklist individual em PDF** (níveis exigidos e verificados, lacunas, evid
 ## Lembretes por e-mail
 
 - Abertura do ciclo (com convite para criar a senha), resultado liberado, validador designado e "esqueci minha senha".
-- Lembretes automáticos de **prazo próximo** (N dias antes, configurável no ciclo) e de **pendência vencida** (semanal), verificados a cada hora. Não duplicam.
+- Lembretes automáticos de **prazo próximo** (N dias antes, configurável no ciclo) e de **pendência vencida** (semanal), verificados todo dia no Vercel (Cron Jobs) ou a cada hora no computador. Não duplicam.
 - Lembretes manuais em *Acompanhamento* (RH e administradora).
 
 Tudo só é enviado depois de "Colocar no ar" e com o SMTP configurado.
@@ -89,12 +110,14 @@ Copie `.env.example` para `.env` ou configure no servidor:
 | Variável | Para quê |
 |---|---|
 | `APP_URL` | Endereço público (links dos e-mails). Com `https://`, os cookies ficam seguros |
-| `PORT` | Porta HTTP (padrão 3000) |
-| `DATA_DIR` | Pasta do banco SQLite e dos anexos (faça backup dela) |
+| `DATABASE_URL` | Banco Postgres (no Vercel, criado pela integração com o Neon). Sem ela, o sistema usa o Postgres embutido em `DATA_DIR/pgdata` |
+| `CRON_SECRET` | Opcional: protege a rota dos lembretes automáticos (`/cron/lembretes`) |
+| `PORT` | Porta HTTP, só para rodar no computador (padrão 3000) |
+| `DATA_DIR` | Pasta do banco embutido, só para rodar no computador |
 | `ADMIN_SENHA_INICIAL` | Senha inicial da administradora |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Servidor de e-mail |
 
-Em produção, use Node.js 22.13 ou mais recente e rode atrás de um proxy com HTTPS (Nginx, Caddy, ou a plataforma de hospedagem) e mantenha um único processo do Node (o banco é SQLite).
+No Vercel, `APP_URL` é opcional: sem ela, os links dos e-mails usam o domínio de produção do projeto. Os backups ficam a cargo do Neon (no painel dele há histórico e restauração).
 
 ## Identidade visual
 
@@ -103,10 +126,11 @@ O logo em `public/img/logo.svg` é **provisório**. Envie o logo oficial em *Adm
 ## Estrutura
 
 ```
+api/index.js           entrada no Vercel (vercel.json direciona todas as rotas para cá)
 src/
   server.js            app Express
   config.js            configurações e .env
-  db/                  esquema, carga inicial (seed-data.js) e exemplos (examples-data.js)
+  db/                  banco Postgres (Neon ou PGlite), esquema, carga inicial e exemplos
   lib/                 regras de negócio (domain), acesso, relatórios, PDF, Excel, e-mail, log, lembretes
   routes/              telas: login, painel, checklists, acompanhamento, relatórios, administração
   views/               páginas (EJS)

@@ -49,25 +49,23 @@ function layout({ title, paragraphs, button, note }) {
 
 /** Coloca o e-mail na caixa de saída e envia (se o sistema estiver no ar). */
 async function queue({ to, toUserId = null, type, subject, title, paragraphs, button, note }) {
-  const db = dbm.get();
   const { html, text } = layout({ title: title || subject, paragraphs, button, note });
-  const testMode = dbm.isTestMode();
+  const testMode = await dbm.isTestMode();
   const status = testMode ? 'retido_teste' : 'pendente';
-  const r = db.prepare(`INSERT INTO email_outbox (to_email, to_user_id, type, subject, html, text, status, created_at)
-                        VALUES (?,?,?,?,?,?,?,?)`).run(to, toUserId, type, subject, html, text, status, nowIso());
-  const id = r.lastInsertRowid;
+  const id = await dbm.insert(`INSERT INTO email_outbox (to_email, to_user_id, type, subject, html, text, status, created_at)
+                        VALUES (?,?,?,?,?,?,?,?)`, to, toUserId, type, subject, html, text, status, nowIso());
   if (testMode) return { id, status };
   const t = getTransporter();
   if (!t) {
-    db.prepare("UPDATE email_outbox SET status = 'erro', error = ? WHERE id = ?").run('Servidor de e-mail (SMTP) não configurado.', id);
+    await dbm.run("UPDATE email_outbox SET status = 'erro', error = ? WHERE id = ?", 'Servidor de e-mail (SMTP) não configurado.', id);
     return { id, status: 'erro' };
   }
   try {
     await t.sendMail({ from: config.smtp.from, to, subject, html, text });
-    db.prepare("UPDATE email_outbox SET status = 'enviado', sent_at = ? WHERE id = ?").run(nowIso(), id);
+    await dbm.run("UPDATE email_outbox SET status = 'enviado', sent_at = ? WHERE id = ?", nowIso(), id);
     return { id, status: 'enviado' };
   } catch (err) {
-    db.prepare("UPDATE email_outbox SET status = 'erro', error = ? WHERE id = ?").run(String(err.message || err).slice(0, 500), id);
+    await dbm.run("UPDATE email_outbox SET status = 'erro', error = ? WHERE id = ?", String(err.message || err).slice(0, 500), id);
     return { id, status: 'erro' };
   }
 }

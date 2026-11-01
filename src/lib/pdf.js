@@ -21,20 +21,33 @@ const LINE = '#D5DAE5';
 const RED = '#B42318';
 const GREEN = '#1E7B4F';
 
-function logoNode(width = 120) {
-  const f = dbm.getSetting('logo_file');
-  if (f) {
-    const p = path.join(config.uploadsDir, f);
-    const ext = path.extname(f).toLowerCase();
-    try {
-      if (ext === '.svg') return { svg: fs.readFileSync(p, 'utf8'), width };
-      if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
-        const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
-        return { image: `data:${mime};base64,${fs.readFileSync(p).toString('base64')}`, width };
-      }
-    } catch { /* usa o logo padrão */ }
+const DEFAULT_LOGO = fs.readFileSync(path.join(config.root, 'public/img/logo.svg'), 'utf8');
+let logoSource = { svg: DEFAULT_LOGO };
+
+/** Carrega o logo enviado pela administradora (guardado no banco) ou o padrão. */
+async function loadLogo() {
+  logoSource = { svg: DEFAULT_LOGO };
+  const row = await dbm.get("SELECT name, mime, data FROM app_files WHERE key = 'logo'");
+  if (!row) return;
+  const ext = path.extname(row.name).toLowerCase();
+  if (ext === '.svg') logoSource = { svg: row.data.toString('utf8') };
+  else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+    logoSource = { image: `data:${ext === '.png' ? 'image/png' : 'image/jpeg'};base64,${row.data.toString('base64')}` };
   }
-  return { svg: fs.readFileSync(path.join(config.root, 'public/img/logo.svg'), 'utf8'), width };
+}
+
+function logoNode(width = 120) {
+  return { ...logoSource, width };
+}
+
+/** Confere se um SVG enviado como logo pode ser desenhado no PDF. */
+async function svgLogoWorks(svg) {
+  try {
+    await pdfmake.createPdf({ content: [{ svg, width: 100 }] }).getBuffer();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const styles = {
@@ -120,6 +133,7 @@ function gapText(required, verified) {
 /* ------------------------------------------------------------- checklist */
 
 async function checklistPdf(bundle, access) {
+  await loadLogo();
   const { cl, cycle, comps, evals, actions, sigs, plan, attachments, ata } = bundle;
   const isSelf = !!cl.self_verification;
   const autoOk = access.seeAuto && evals.auto && evals.auto.status === 'enviada';
@@ -335,6 +349,7 @@ function filtersText(report) {
 }
 
 async function reportPdf(report, section, TABS) {
+  await loadLogo();
   const sections = reportSections(report, TABS);
   const keys = section === 'todas' ? Object.keys(TABS) : [section];
   const content = [
@@ -351,6 +366,7 @@ async function reportPdf(report, section, TABS) {
 }
 
 async function sgiPdf(cycle, data) {
+  await loadLogo();
   const cov = data.coverage;
   // pdfmake altera os nós durante o layout: cada célula precisa de um objeto novo
   const yes = () => ({ text: 'Sim', color: GREEN, bold: true });
@@ -379,4 +395,4 @@ async function sgiPdf(cycle, data) {
   return render({ content, footer: footer(cycle.name) });
 }
 
-module.exports = { checklistPdf, reportPdf, sgiPdf };
+module.exports = { checklistPdf, reportPdf, sgiPdf, svgLogoWorks };

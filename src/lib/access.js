@@ -2,6 +2,8 @@
 // Quem pode ver e fazer o quê em cada checklist (regras de perfil + LGPD).
 const domain = require('./domain');
 
+// Recebe as assinaturas já carregadas (bundle.sigs) para continuar síncrona.
+
 /**
  * Permissões do usuário efetivo (viewer) sobre um checklist.
  * Regras principais:
@@ -10,7 +12,7 @@ const domain = require('./domain');
  *  - Consulta do SGI não vê notas individuais (não abre checklists).
  *  - Execução do ciclo (RH) consulta os registros depois da liberação do resultado, sem editar.
  */
-function checklistAccess(viewer, cl, evals) {
+function checklistAccess(viewer, cl, evals, sigs = {}) {
   const isOwner = cl.user_id === viewer.id;
   const isSelf = !!cl.self_verification;
   const isEvaluator = !isSelf && cl.evaluator_user_id === viewer.id;
@@ -35,7 +37,7 @@ function checklistAccess(viewer, cl, evals) {
   const seeGestor = isOwner ? released : (isEvaluator || isValidator || general || rhRecord);
   const seeRequired = true;
 
-  const hasSignature = Object.keys(domain.signaturesOf(cl.id)).length > 0;
+  const hasSignature = Object.keys(sigs).length > 0;
   const planEditable = cycleOpen && !signed && !hasSignature;
 
   return {

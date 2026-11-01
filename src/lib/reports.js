@@ -17,12 +17,12 @@ function applyFilters(list, f) {
 }
 
 /** Monta o detalhe de cada checklist do conjunto (com máscara da autoavaliação quando necessário). */
-function detailRows(list, cycle, viewer) {
-  const versionId = domain.cycleVersionId(cycle);
-  const comps = versionId ? domain.competenciesOf(versionId) : [];
-  const levels = versionId ? domain.levelsOf(versionId) : {};
-  return list.map((cl) => {
-    const evals = domain.getEvaluations(cl.id);
+async function detailRows(list, cycle, viewer) {
+  const versionId = await domain.cycleVersionId(cycle);
+  const comps = versionId ? await domain.competenciesOf(versionId) : [];
+  const levels = versionId ? await domain.levelsOf(versionId) : {};
+  return Promise.all(list.map(async (cl) => {
+    const evals = await domain.getEvaluations(cl.id);
     const autoSent = domain.isSubmitted(evals.auto);
     const gestorSent = domain.isSubmitted(evals.gestor);
     const masked = !!viewer && !cl.self_verification && cl.evaluator_user_id === viewer.id && !gestorSent;
@@ -48,16 +48,16 @@ function detailRows(list, cycle, viewer) {
         meets: gestor != null ? gestor >= required : null,
       });
     }
-    const actions = domain.actionsOf(cl.id);
-    const sigs = domain.signaturesOf(cl.id);
-    const plan = domain.planSummary(cl.id, actions);
+    const actions = await domain.actionsOf(cl.id);
+    const sigs = await domain.signaturesOf(cl.id);
+    const plan = await domain.planSummary(cl.id, actions);
     return {
       cl, items, actions, sigs, plan, autoSent, gestorSent, masked,
       evaluatorLabel: domain.evaluatorLabel(cl),
       stage: domain.stageOf(cl, evals, sigs, plan),
-      hasAta: domain.hasAta(cl.id),
+      hasAta: await domain.hasAta(cl.id),
     };
-  });
+  }));
 }
 
 function coverageOf(rows) {
@@ -163,11 +163,11 @@ function gapRegister(rows) {
   };
 }
 
-function summaryForComparison(cycle, filters) {
-  const list = applyFilters(domain.listChecklists(cycle.id), filters);
-  const rows = detailRows(list, cycle, null);
-  const versionId = domain.cycleVersionId(cycle);
-  const comps = versionId ? domain.competenciesOf(versionId) : [];
+async function summaryForComparison(cycle, filters) {
+  const list = applyFilters(await domain.listChecklists(cycle.id), filters);
+  const rows = await detailRows(list, cycle, null);
+  const versionId = await domain.cycleVersionId(cycle);
+  const comps = versionId ? await domain.competenciesOf(versionId) : [];
   const verified = rows.flatMap((r) => r.items.filter((i) => i.gestor != null));
   const atende = verified.filter((i) => i.meets).length;
   return {
@@ -183,20 +183,20 @@ function summaryForComparison(cycle, filters) {
  * Relatório completo de um ciclo com filtros { area, gestor, cargo }.
  * viewer: usuário efetivo (para esconder autoavaliações de quem ainda vai avaliar).
  */
-function buildReport(cycle, filters = {}, viewer = null) {
-  const all = domain.listChecklists(cycle.id);
+async function buildReport(cycle, filters = {}, viewer = null) {
+  const all = await domain.listChecklists(cycle.id);
   const list = applyFilters(all, filters);
-  const rows = detailRows(list, cycle, viewer);
-  const versionId = domain.cycleVersionId(cycle);
-  const comps = versionId ? domain.competenciesOf(versionId) : [];
+  const rows = await detailRows(list, cycle, viewer);
+  const versionId = await domain.cycleVersionId(cycle);
+  const comps = versionId ? await domain.competenciesOf(versionId) : [];
   const ids = new Set(list.map((c) => c.id));
-  const pend = tasks.cyclePendencias(cycle).filter((p) => ids.has(p.checklistId));
-  const prev = domain.previousCycle(cycle);
-  const current = summaryForComparison(cycle, filters);
+  const pend = (await tasks.cyclePendencias(cycle)).filter((p) => ids.has(p.checklistId));
+  const prev = await domain.previousCycle(cycle);
+  const current = await summaryForComparison(cycle, filters);
   return {
     cycle,
     filters,
-    version: versionId ? domain.getVersion(versionId) : null,
+    version: versionId ? await domain.getVersion(versionId) : null,
     comps,
     rows,
     coverage: coverageOf(rows),
@@ -214,15 +214,15 @@ function buildReport(cycle, filters = {}, viewer = null) {
     byGestor: aggregate(rows, (r) => (r.cl.self_verification ? 'auto' : r.cl.evaluator_user_id),
       (r) => (r.cl.self_verification ? 'Autoverificação (validada por terceiro)' : r.cl.evaluator_name)),
     byArea: aggregate(rows, (r) => r.cl.area, (r) => r.cl.area),
-    comparison: prev ? { previous: summaryForComparison(prev, filters), current } : null,
+    comparison: prev ? { previous: await summaryForComparison(prev, filters), current } : null,
   };
 }
 
 /** Opções dos filtros (áreas, gestores e cargos presentes no ciclo). */
-function filterOptions(cycle) {
-  const list = domain.listChecklists(cycle.id);
+async function filterOptions(cycle) {
+  const list = await domain.listChecklists(cycle.id);
   const areas = [...new Set(list.map((c) => c.area))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const gestores = domain.managersInCycle(cycle.id);
+  const gestores = await domain.managersInCycle(cycle.id);
   const cargos = [...new Map(list.map((c) => [c.cargo_id, { id: c.cargo_id, label: `${c.cargo_code} — ${c.cargo_short}` }])).values()];
   return { areas, gestores, cargos, hasSelf: list.some((c) => c.self_verification) };
 }
