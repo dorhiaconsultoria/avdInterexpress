@@ -6,7 +6,7 @@ Também é a evidência do **item 7 do Registro SGI (E3.3.1)**: mostra que a emp
 
 ## Como rodar
 
-Requisitos: Node.js 20 ou mais recente.
+Requisitos: Node.js 22.13 ou mais recente (a versão LTS do site nodejs.org serve). O banco é o SQLite que já vem no próprio Node, então o `npm install` não precisa compilar nada (não exige Python nem Visual Studio).
 
 ```bash
 npm install
@@ -94,7 +94,7 @@ Copie `.env.example` para `.env` ou configure no servidor:
 | `ADMIN_SENHA_INICIAL` | Senha inicial da administradora |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Servidor de e-mail |
 
-Em produção, rode atrás de um proxy com HTTPS (Nginx, Caddy, ou a plataforma de hospedagem) e mantenha um único processo do Node (o banco é SQLite).
+Em produção, use Node.js 22.13 ou mais recente e rode atrás de um proxy com HTTPS (Nginx, Caddy, ou a plataforma de hospedagem) e mantenha um único processo do Node (o banco é SQLite).
 
 ## Identidade visual
 
